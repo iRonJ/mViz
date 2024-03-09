@@ -25,20 +25,23 @@ struct ContentView: View {
                 if let scene = try? await Entity(named: "Scene", in: realityKitContentBundle) {
                     content.add(scene)
                 }
+
             } update: { content in
                 // Update the RealityKit content when SwiftUI state changes
                 if let scene = content.entities.first {
-                    let uniformScale: Float = enlarge ? 1.4 : 1.0
+                    let uniformScale: Float = enlarge ? 10.4 : 1.0
                     scene.transform.scale = [uniformScale, uniformScale, uniformScale]
-                }
+                    
+                    }
             }
-            .gesture(TapGesture().targetedToAnyEntity().onEnded { _ in
+                    .gesture(TapGesture().targetedToAnyEntity().onEnded { _ in
                 enlarge.toggle()
             })
 
             VStack (spacing: 12) {
                 Toggle("Enlarge RealityView Content", isOn: $enlarge)
                     .font(.title)
+                    .bold()
 
                 Toggle("Show ImmersiveSpace", isOn: $showImmersiveSpace)
                     .font(.title)
@@ -67,6 +70,7 @@ struct ContentView: View {
             }
         }
     }
+
 }
 
 #Preview(windowStyle: .volumetric) {

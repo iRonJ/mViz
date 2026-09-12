@@ -1,79 +1,132 @@
 # mViz
 
-A visionOS 26 music visualizer built with SwiftUI, RealityKit, and AVAudioEngine. Built with Xcode 26.6 / visionOS 26.5 SDK. The original Reality Composer assets remain in Packages for reference; the app generates its scene in code.
+A spatial audio visualizer for visionOS built with SwiftUI, RealityKit, and AVAudioEngine. Built for Apple Vision Pro with Xcode 16 / visionOS 2+ SDK.
+
+https://github.com/user-attachments/assets/demo
+
+<div align="center">
+  <video src="Docs/media/mViz-demo.mp4" controls width="100%" poster="Docs/media/mViz-demo-poster.jpg"></video>
+  <p><em>Apple Vision Pro spatial capture of mViz in passthrough mode, showcasing real-time audio reactivity, room surface illumination, and floating visionOS spatial controls.</em></p>
+</div>
+
+[![mViz Spatial Demo](Docs/media/mViz-demo-poster.jpg)](Docs/media/mViz-demo.mp4)
+
+---
 
 ## Run on Vision Pro
 
-Open `mViz.xcodeproj`, choose the `mViz` scheme and your paired Vision Pro, then Run. The project retains its existing development team and bundle identifier.
+1. Open `mViz.xcodeproj` in Xcode.
+2. Select the `mViz` scheme and your paired **Apple Vision Pro** hardware (or visionOS Simulator).
+3. Build & Run (`Cmd + R`).
 
-Choose **Enter visualizer**. **Show surroundings** switches live between passthrough and full immersion. The floating **Settings** panel exposes movement, shape, speed, intensity, sensitivity, and room interaction. **Leave** exits; the system immersion controls also work.
+Choose **Enter visualizer** on the main window. **Show surroundings** toggles live between passthrough and full immersion. The floating **Settings** ornament panel exposes movement modes, particle forms, speed, intensity, sensitivity, and room interaction. Tap **Leave** or use system immersion controls to exit.
 
-## Visual modes
+---
 
-- **Flurry spectrum:** ten stationary spectrum columns five meters in front of the viewer, ordered from 31 Hz to 16 kHz to match the GEQ. Colored, wispy light trails curl upward from each column's audio-reactive tip, inspired by the classic macOS Flurry screensaver. The display stays fixed after entry; Recenter brings it in front of you again. Works with passthrough or full immersion and joins automatic transitions. Use imported audio or microphone input for real spectrum data.
-- **Nebula:** an orbiting spherical constellation of color with 3D inclined orbital planes that sweep directly above the user (zenith) and beneath the user (nadir) with oscillating rotational direction.
-- **Double helix:** braided vertical double-helix strands that spiral upward from directly below your feet, expand around you at eye level, and twist together directly above your head.
-- **Aurora:** draped celestial ribbons culminating in a luminous overhead crown / corona dancing directly above the user's head.
-- **Vortex:** a 3D cyclone with spiraling height and radius changes, narrowing into a funnel tip directly below the user and spiraling into a vortex spout directly above.
+## 12 Spatial Movement Modes
+
+mViz features twelve distinct movement kinematics spanning a full 360° celestial sphere around the listener:
+
+- **Cosmic fog:** A volumetric 3D particle mist cloud that envelops the listener in a living, breathing nebula of harmonic laminar flow, gentle tidal drift, wide particle spread, and subtle breathing luminescence.
+- **Supernova:** A relativistic pulsar featuring energetic polar plasma jets erupting straight toward the ceiling ( pprox 3.5	ext{m}$) and floor ( pprox 0.3	ext{m}$), encircled by a high-velocity equatorial accretion disk with relativistic streak elongation and transient beat strobes.
+- **Flurry spectrum:** Ten stationary spectrum columns five meters in front of the viewer, ordered from 31 Hz to 16 kHz to match the 10-band GEQ. Colored, wispy light trails curl upward from each column's audio-reactive tip, inspired by the classic macOS Flurry screensaver. Tap **Recenter** to reposition in front of your head orientation.
+- **Nebula:** An orbiting spherical constellation of color with 3D inclined orbital planes that sweep directly above the user (zenith) and beneath the user (nadir) with oscillating rotational direction.
+- **Double helix:** Braided vertical double-helix strands that spiral upward from directly below your feet, expand outward around you at eye level, and twist together directly above your head.
+- **Aurora:** Draped celestial ribbons culminating in a luminous overhead crown / corona dancing directly above the user's head.
+- **Vortex:** A 3D cyclone with spiraling height and radius changes, narrowing into a funnel tip directly below the user and spiraling into a vortex spout directly above.
 - **Mirror line:** 12 emitters arranged symmetrically in a horizontal line in front of the user perspective, reacting with mirrored wave dynamics and paired colors. Tap **Center stage in front of me** to align the line with your current head orientation.
-- **Mirror plane:** a 4×3 planar grid of emitters positioned in front of the user with symmetrical undulating wave motion and mirrored color coordination.
-- **Rain:** gentle downward precipitation distributed across the entire overhead sky disk—including directly above the user's head—with stretched particle trails, gravity simulation, and lateral drift.
-- **Volcano:** explosive upward eruption from caldera vents spanning the ground plane directly below the user with bass-reactive velocity and spread, warm fiery colors, and gravity pulling particles back down.
-- **Room bounce:** a pool of up to 96 audio-reactive physics particles colliding with detected room surfaces, launched from emitters traversing ceiling to floor. Colors dynamically shift across the spectrum based on real-time audio frequency balance. Enable **Include Room bounce**, grant World Sensing access, and look around to scan. The mode joins the automatic journey once sensing is available, or select it manually. If permission or surfaces are unavailable, ambient particles continue and the panel explains the state.
+- **Mirror plane:** A 4×3 planar grid of emitters positioned in front of the user with symmetrical undulating wave motion and mirrored color coordination.
+- **Rain:** Gentle downward precipitation distributed across the entire overhead sky disk—including directly above the user's head—with stretched particle trails, gravity simulation, and lateral drift.
+- **Volcano:** Explosive upward eruption from caldera vents spanning the ground plane directly below the user with bass-reactive velocity and spread, warm fiery colors, and gravity pulling particles back down.
+- **Room bounce:** A pool of up to 96 audio-reactive physics particles colliding with detected room surfaces, launched from emitters traversing ceiling to floor. Colors dynamically shift across the spectrum based on real-time audio frequency balance. Enabled by default; requires World Sensing permission. If surfaces are unavailable, ambient particles continue and the panel explains the state.
 
-All 360° modes maintain a 1.35m spherical clearance around the user at eye level so emitters never clip into your personal space, while allowing complete freedom to pass directly overhead and underfoot.
+> **Spherical 360° Clearance:** All 360° modes maintain a 1.35m spherical clearance around the user at eye level:
+> 66623	ext{minRadius} = \sqrt{\max(0, 1.35^2 - (y - 1.5)^2)}66623
+> Emitters freely pass directly overhead (zenith) and underfoot (nadir) without ever clipping into your personal eye space.
 
-## Particle Styles and Forms
+---
+
+## 10-Band ISO Graphic Equalizer (GEQ) & VU Meter
+
+- **DSP Filter Bank (`BandAnalyzer.swift`):** Powered by a true 10-band ISO standard Graphic Equalizer running second-order constant-skirt-gain biquad bandpass IIR filters with zero algorithmic latency:
+  - **ISO Center Frequencies:** `31.25 Hz`, `62.5 Hz`, `125 Hz`, `250 Hz`, `500 Hz`, `1 kHz`, `2 kHz`, `4 kHz`, `8 kHz`, `16 kHz`.
+- **Spatial Emitter Mapping (`ParticleField.swift`):** Each of the 10 frequency bands is mapped directly to a dedicated spatial particle emitter (Emitters 0–9: sub-bass pulse, kick body, basslines, warmth, vocal clarity, attack bite, percussion presence, air shimmer) plus 2 macro dynamic emitters (Emitters 10–11).
+- **10-Band Spectrum Analyzer (`VUMeterView.swift`):** Features an interactive vertical 10-band LED spectrum analyzer displayed above macro BASS/MID/HIGH level meters with peak indicators and signal status badges.
+
+---
+
+## Particle Styles & Shapes
 
 - **Particle Styles:** Choose between **Glow** (soft radial bloom), **Sparks** (sharp directional bursts with fast decay), **Halo rings** (expanding rings), **Snowflakes** (intricate 6-point crystals with rotational noise), or **Evolving** (cycles automatically through styles every 12 seconds).
 - **Emitter Shapes:** Choose between **Spheres**, **Rings** (torus), **Ribbons** (plane), **Cones**, **Cubes** (box), or **Evolving** (cycles through shapes every 8 seconds, contracting the emission surface before smoothly morphing).
-- **Motion Speed:** Adjustable slider spanning 0.25× to 3.00× controlling angular velocity, emitter displacement, and particle flight dynamics.
+- **Motion Speed:** Default `2.6×`. Adjustable slider spanning `0.25×` to `3.00×` controlling angular velocity, emitter displacement, and particle flight dynamics.
 
-## Beat Lighting & Audio Sync
+---
 
-- **Styles:** **Evolving** (default — transitions automatically with particle modes, smoothly fading between pulse, strobe, and off phases), **Off** (forced off), **Pulse** (smooth exponential decay), or **Strobe** (crisp onset flash).
-- **Mode-Driven Lighting Transitions & Smooth Fading:** Each movement pattern carries its own preferred lighting profile:
-  - **No Pulse/Strobe (Off Phase):** Nebula, Mirror plane, and Rain provide calm, peaceful rest periods with zero lighting flashes.
-  - **Smooth Pulse:** Double helix, Aurora, and Room bounce feature breathing beat pulses.
-  - **Dynamic Strobe:** Volcano, Vortex, and Mirror line feature explosive, energetic beat strobes.
-  - As the visualizer transitions between movement modes (either automatically every 18 seconds or upon manual selection), the lighting intensities smoothly **fade in and fade out** according to continuous motion blend weights.
-- **Surface & Background Illumination:** Flashes light onto detected room surface meshes (in passthrough) or the surrounding celestial sphere (in full immersion) synchronized to bass beats.
-- **Safety & Accessibility:** Flashes are strictly rate-limited to a maximum of 2 Hz (at least 0.5s refractory period). When system **Reduce Motion** is active, strobe automatically downgrades to a gentle pulse.
-- **Audio Sync Delay (Latency Compensation):** A slider ranging from `0.00s` to `0.60s` (default `0.25s`). During playlist playback, an `AVAudioUnitDelay` in the audio engine holds the sound output by 0.25 seconds while the visual analyzer taps the audio ahead of time. This compensates for graphics pipeline and beat detection latency, ensuring the visual strobe and beat hit at the exact same instant.
+## Beat Lighting & Latency Compensation
 
-## Performance Optimizations
+- **Lighting Profiles:** **Evolving** (default — transitions automatically with particle modes, smoothly fading between pulse, strobe, and off phases), **Off** (forced off), **Pulse** (smooth exponential decay), or **Strobe** (crisp onset flash).
+- **Mode-Driven Lighting Profiles:**
+  - *Calm / Off Phase:* Nebula, Mirror plane, Rain.
+  - *Smooth Pulse:* Double helix, Aurora, Cosmic fog, Room bounce.
+  - *Dynamic Strobe:* Volcano, Vortex, Supernova, Mirror line.
+  - Lighting intensities smoothly fade in and fade out according to continuous motion blend weights.
+- **Surface & Celestial Illumination:** Synchronized flashes illuminate detected room surface meshes (in passthrough) or the surrounding celestial sphere (in full immersion) on bass beats.
+- **Photosensitivity Safety:** Flashes are strictly rate-limited to a maximum of 2 Hz ($\ge 0.5\text{s}$ refractory cooldown). When system **Reduce Motion** is active, strobe automatically downgrades to a gentle pulse.
+- **Audio Sync Delay:** Slider ranging from `0.00s` to `0.60s` (default `0.25s`) compensates for audio-to-visual rendering pipeline latency.
 
-- **VSYNC-Driven Render Loop:** Replaced the legacy 33ms `Task.sleep` pump with a native RealityKit `SceneEvents.Update` subscription (`content.subscribe(to: SceneEvents.Update.self)`), eliminating the 30 FPS hard cap and allowing the scene to render at native headset refresh rate (90 FPS).
-- **Lock-Free / Unfair-Lock Band Storage:** Audio analysis runs on CoreAudio threads and writes frequency bands into `AudioBandStorage` using `os_unfair_lock`, eliminating ~45 `Task { @MainActor }` allocations and queue hops per second.
-- **Material Caching & Component Batching:** Room physics particles share 8 pre-generated `UnlitMaterial` buckets updated only when spectral energy shifts, eliminating up to 96 material allocations per frame. Mesh illumination in `RoomEnvironment` reuses a single shared material and short-circuits when light is off.
-- **Emitters & Dynamics Optimization:** Blended mode dynamics are computed once per frame rather than inside each emitter loop (from 108 down to 9 calls). Emitters are selectively paused based on mode (e.g. stage emitters are muted when in 360° orbit modes).
+---
+
+## Audio Sources & Continuous Playback
+
+- **Apple Music Library:** Uses MusicKit (`MusicLibraryRequest<Song>`) to browse library tracks with real-time search. Initialized with continuous queue playback (`music.queue = .init(for: librarySongs, startingAt: song)`). Playback and autoplay continue seamlessly even when the browser sheet is dismissed. Features automatic track title monitoring and skip-to-next support.
+- **Acoustic Microphone Tap:** When playing DRM-protected Apple Music, an acoustic microphone tap captures the speaker audio and feeds the 10-band GEQ filter bank with zero synthetic waveforms. Audio settles naturally to idle between tracks.
+- **Imported Playlists:** Import DRM-free audio files via file picker. Songs are stored locally with persistent star ratings, favorites, and completed-play counts. Includes **Favorites Mix** shuffle.
+- **Microphone Mode:** Choose **Start microphone** to visualize any external live audio from room speakers or instruments.
+
+---
+
+## Performance Architecture
+
+- **VSYNC-Driven 90 FPS Render Loop:** Subscribes natively to RealityKit `SceneEvents.Update`, rendering at native headset refresh rate without timer stalls.
+- **Lock-Free Band Storage:** Uses `os_unfair_lock` in `AudioBandStorage` for thread-safe cross-thread transfer between CoreAudio realtime threads and RealityKit frames.
+- **Material Caching:** Room physics particles share pre-allocated `UnlitMaterial` buckets updated only on spectral shifts, eliminating per-frame allocations.
+- **Pure SwiftUI Views:** Decoupled audio envelope reads from SwiftUI body evaluations, eliminating layout invalidation loops and launch hangs.
+
+---
 
 ## Code Organization
 
-- `mViz/Modes/`: Individual pattern definitions (`AuroraMode`, `HelixMode`, `MirrorLineMode`, `MirrorPlaneMode`, `NebulaMode`, `RainMode`, `RoomBounceMode`, `VolcanoMode`, `VortexMode`) conforming to `MotionPattern`.
+- `mViz/Modes/`: 12 motion pattern definitions conforming to `MotionPattern` (`AuroraMode`, `CosmicFogMode`, `FlurrySpectrumMode`, `HelixMode`, `MirrorLineMode`, `MirrorPlaneMode`, `NebulaMode`, `RainMode`, `RoomBounceMode`, `SupernovaMode`, `VolcanoMode`, `VortexMode`).
 - `mViz/Rendering/`: Core RealityKit rendering, `ParticleField`, `MotionBlend`, `ParticleAppearance`, `RoomEnvironment`, `RoomPhysics`, `BeatPulse`, and `AudioColor`.
-- `mViz/Audio/`: Audio engine, multi-channel `BandAnalyzer`, `LocalTrack`, and `LocalMusicPlayer`.
-- `mViz/Model/`: Observable app state (`VisualizerModel`).
-- `mViz/Views/`: SwiftUI views for controls, playlist, and the rebuilt music browser.
+- `mViz/Audio/`: 10-band `BandAnalyzer`, `LocalMusicPlayer`, `LocalTrack`, and `AppleMusicURLParser`.
+- `mViz/Model/`: Observable app state (`VisualizerModel` and `QueuedTrack`).
+- `mViz/Views/`: SwiftUI views for 10-band `VUMeterView`, `VisualizerControls`, `MusicBrowserView`, and `PlaylistView`.
+- `Docs/media/`: Demo video recordings and poster assets.
 
-## Audio and playlists
+---
 
-**Demo choreography** animates without audio. For surrounding music, choose **Start microphone** or **Use microphone**, grant access, and play music on nearby speakers. Bass drives size/emission, mids drive motion, and treble adds emission accents, with attack/release smoothing.
+## Verification & Automated Tests
 
-**Your playlist → Import audio** accepts multiple unprotected audio files from Files. mViz validates them and keeps private copies in its Application Support folder. Tap a track or **Play playlist**. Audio plays through AVAudioEngine and its mixer feeds the band analyzer directly, with independent analysis per output channel. Microphone capture is stopped during file playback. Pause/resume and Next are available in the immersive panel.
+Run the test suites locally from the repository root:
 
-The imported track list, star ratings, favorites, and completed-play counts survive relaunches. By default, tracks play in sequential playlist order with **Autoplay next track** enabled. Turning on **Favorites mix** randomly selects tracks rated at least 3 stars OR marked favorite, excluding the current track when other eligible tracks exist. If Favorites mix is on but no tracks qualify, playback stops and explains how to mark eligible songs. Tap a rating menu or heart to edit mViz preferences. Removing a track deletes only the app’s copy. Playlist creation does not modify Apple Music.
+```bash
+# 10-Band GEQ DSP and frequency response checks
+sh Tests/run-audio-checks.sh
 
-**Browse music** provides a unified modal sheet with two tabs:
-1. **Music Library:** Uses modern MusicKit APIs (`MusicLibraryRequest<Song>`) to browse your songs with real-time text filtering and pagination. Plays through Apple Music's player; enable microphone input for audio-reactive visuals. Autoplay uses the currently loaded library songs in their displayed library order. Favorites mix applies only to imported tracks.
-2. **Importable device files:** Uses MediaPlayer query (`MPMediaQuery.songs()`) to discover locally stored DRM-free songs, with one-tap import into mViz preserving star ratings.
+# 12 movement modes, eye clearance, boundary, and blend tests
+sh Tests/run-visualizer-checks.sh
 
-Capture/playback stops on immersive exit, audio interruptions, route changes, and when the control window backgrounds without an active immersive space. Restart audio explicitly after an interruption. No microphone recordings are saved or uploaded.
+# Apple Music URL parsing and shared queue state checks
+sh Tests/run-queue-checks.sh
 
-## Validation
+# Production playback queue policy checks
+sh Tests/run-playback-checks.sh
+```
 
-- `sh Tests/run-audio-checks.sh`: silence and low/mid/high tones at 44.1 and 48 kHz.
-- `sh Tests/run-visualizer-checks.sh`: all nine movement modes, smooth bounded transitions, stage symmetry, speed scaling, reversing motion, spectral audio colors, strobe rate limits, favorites shuffle, and playlist migration.
-- Signed Debug build and live deployment on Apple Vision Pro hardware.
+---
 
-For Apple Music waveform-access findings and a draft inquiry to Apple, see [Apple Music audio access](Docs/AppleMusicAudioAccess.md). Run `sh Tests/run-playback-checks.sh` for production queue-policy regression checks.
+## Documentation
+
+- [Apple Music Audio Access & Investigation](Docs/AppleMusicAudioAccess.md): Comprehensive findings on visionOS audio APIs and system tap constraints.
+- [Private Audio Investigation](Docs/PrivateAudioInvestigation.md): Analysis of CoreAudio and ProcessAssertion tap possibilities.

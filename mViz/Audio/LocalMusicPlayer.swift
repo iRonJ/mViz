@@ -248,8 +248,15 @@ final class LocalMusicPlayer {
         model.bandStorage.bands10 = geq10
       }
       if tapStarted {
+        tap.onFirstSampleReceived = { [weak self, weak model] in
+          guard let self, let model else { return }
+          self.audioTapSource = "Direct Tap (Active)"
+          if model.listening {
+            model.stopListening()
+          }
+        }
         self.privateTap = tap
-        self.audioTapSource = "Direct Tap (connecting…)"
+        self.audioTapSource = "Direct Tap (loading audio data… 0.0s)"
         NSLog("MVPrivateAudioTap active for Apple Music: %@", tap.diagnostic)
       } else {
         self.audioTapSource = "Acoustic Tap (Microphone Fallback)"
@@ -275,18 +282,23 @@ final class LocalMusicPlayer {
 #if DEBUG
           let count = self.privateTap?.samplesReceivedCount ?? 0
           if count > 0 {
-            self.audioTapSource = "Direct Tap (\(count) frames)"
+            let target = self.privateTap?.activeTargetName ?? "Direct"
+            self.audioTapSource = "Direct Tap • \(target) (\(count) frames)"
             if model?.listening == true {
               model?.stopListening()
             }
-          } else if monitorTicks >= 4 && self.isPlaying && !self.userStoppedMicrophone {
-            if model?.listening != true {
+          } else if self.isPlaying && !self.userStoppedMicrophone {
+            let elapsed = Double(monitorTicks) * 0.3
+            if elapsed < 8.0 {
+              // Allow generous buffer window for Apple Music stream & FairPlay audio data loading
+              self.audioTapSource = String(format: "Direct Tap (loading audio data… %.1fs)", elapsed)
+            } else if model?.listening != true {
               self.audioTapSource = "Acoustic Tap (Microphone Fallback)"
               await model?.start()
             }
           }
 #else
-          if monitorTicks >= 4 && self.isPlaying && !self.userStoppedMicrophone && model?.listening != true {
+          if monitorTicks >= 25 && self.isPlaying && !self.userStoppedMicrophone && model?.listening != true {
             self.audioTapSource = "Acoustic Tap (Microphone Fallback)"
             await model?.start()
           }

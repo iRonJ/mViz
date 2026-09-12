@@ -20,7 +20,7 @@ struct CosmicFogMode: MotionPattern {
       speedBoost: -0.04, // slow atmospheric drifting mist
       gravity: 0,
       spreadBoost: 0.75, // wide diffuse volumetric mist
-      birthBoost: 60 * bass, // volumetric cloud breathes with the music
+      birthBoost: 0.6 * bass, // volumetric cloud breathes with the music
       lifeSpan: 3.8, // long-lived drifting fog
       stretch: nil,
       sizeScale: 2.2, // large soft volumetric particle cloud

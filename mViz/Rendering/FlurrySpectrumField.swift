@@ -51,7 +51,7 @@ final class FlurrySpectrumField {
 
   func update(
     levels: SIMD16<Float>, time: Float, weight: Float, intensity: Float,
-    speed: Float, reduceMotion: Bool
+    speed: Float, reduceMotion: Bool, particleSize: Float
   ) {
     root.isEnabled = weight > 0.001
     guard root.isEnabled else { return }
@@ -77,13 +77,15 @@ final class FlurrySpectrumField {
       if band < 3 {
         // Low bands: bass pumps particle size
         particles.mainEmitter.size = 0.022 + pow(level, 1.25) * 0.035
-        particles.mainEmitter.birthRate = (12 + pow(level, 1.1) * 110) * max(0, min(1, intensity)) * weight
+        particles.mainEmitter.birthRate =
+          (12 + pow(level, 1.1) * 110) * max(0, min(1, intensity)) * weight
         particles.mainEmitter.noiseStrength = reduceMotion ? 0.02 : 0.15
         particles.mainEmitter.noiseAnimationSpeed = rate * 0.35
       } else if band < 7 {
         // Mid bands: melodic energy surges birth rate
         particles.mainEmitter.size = 0.020 + level * 0.015
-        particles.mainEmitter.birthRate = (15 + pow(level, 1.2) * 180) * max(0, min(1, intensity)) * weight
+        particles.mainEmitter.birthRate =
+          (15 + pow(level, 1.2) * 180) * max(0, min(1, intensity)) * weight
         particles.mainEmitter.noiseStrength = reduceMotion ? 0.02 : 0.22
         particles.mainEmitter.noiseAnimationSpeed = rate * 0.4
       } else {
@@ -95,6 +97,8 @@ final class FlurrySpectrumField {
         particles.mainEmitter.noiseAnimationSpeed = rate * (0.4 + sizzle * 3.0)
       }
 
+      particles.mainEmitter.size *= particleSize
+      particles.mainEmitter.sizeVariation = 0.012 * particleSize
       particles.mainEmitter.lifeSpan = 3.2 / Double(sqrt(rate))
       wisp.components.set(particles)
     }

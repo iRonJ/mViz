@@ -27,9 +27,9 @@ struct VUMeterView: View {
     }
     let raw = model.bands * model.sensitivity * 8
     return SIMD3<Float>(
-      min(1, max(0, raw.x)),
-      min(1, max(0, raw.y)),
-      min(1, max(0, raw.z))
+      AudioLevelCurve.map(raw.x, logarithmic: model.logarithmicLevels),
+      AudioLevelCurve.map(raw.y, logarithmic: model.logarithmicLevels),
+      AudioLevelCurve.map(raw.z, logarithmic: model.logarithmicLevels)
     )
   }
 
@@ -40,7 +40,7 @@ struct VUMeterView: View {
     let raw10 = model.bands10 * model.sensitivity * 8
     var res = SIMD16<Float>.zero
     for i in 0..<10 {
-      res[i] = min(1, max(0, raw10[i]))
+      res[i] = AudioLevelCurve.map(raw10[i], logarithmic: model.logarithmicLevels)
     }
     return res
   }

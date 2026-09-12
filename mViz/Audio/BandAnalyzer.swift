@@ -50,15 +50,15 @@ public struct BandAnalyzer: Sendable {
 
   /// Process incoming PCM float samples and return both 3-band macro and 10-band ISO GEQ energy.
   public mutating func processDetailed(
-    _ samples: UnsafePointer<Float>, count: Int, sampleRate: Double
+    _ samples: UnsafePointer<Float>, count: Int, sampleRate: Double, stride: Int = 1
   ) -> (macro: SIMD3<Float>, geq10: SIMD16<Float>) {
-    guard count > 0, sampleRate > 0 else { return (.zero, .zero) }
+    guard count > 0, sampleRate > 0, sampleRate.isFinite, stride > 0 else { return (.zero, .zero) }
     updateCoefficients(sampleRate: sampleRate)
 
     var power = SIMD16<Float>.zero
 
     for s in 0..<count {
-      let sample = samples[s]
+      let sample = samples[s * stride]
       let x = sample.isFinite ? sample : 0
       let xVec = SIMD16<Float>(repeating: x)
       // Vectorized biquad bandpass filter across all 10 bands simultaneously:

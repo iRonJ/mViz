@@ -4,10 +4,48 @@ struct LocalTrack: Codable, Identifiable {
   var id: UUID
   var title: String
   var filename: String
-  var playCount = 0
+  var playCount: Int
   var lastPlayed: Date?
   var rating: Int?
   var isFavorite: Bool?
+  var persistentID: UInt64?
+
+  init(
+    id: UUID,
+    title: String,
+    filename: String,
+    playCount: Int = 0,
+    lastPlayed: Date? = nil,
+    rating: Int? = nil,
+    isFavorite: Bool? = nil,
+    persistentID: UInt64? = nil
+  ) {
+    self.id = id
+    self.title = title
+    self.filename = filename
+    self.playCount = playCount
+    self.lastPlayed = lastPlayed
+    self.rating = rating
+    self.isFavorite = isFavorite
+    self.persistentID = persistentID
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id, title, filename, playCount, lastPlayed, rating, isFavorite, persistentID
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(UUID.self, forKey: .id)
+    title = try container.decode(String.self, forKey: .title)
+    filename = try container.decode(String.self, forKey: .filename)
+    playCount = try container.decodeIfPresent(Int.self, forKey: .playCount) ?? 0
+    lastPlayed = try container.decodeIfPresent(Date.self, forKey: .lastPlayed)
+    rating = try container.decodeIfPresent(Int.self, forKey: .rating)
+    isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite)
+    persistentID = try container.decodeIfPresent(UInt64.self, forKey: .persistentID)
+  }
+
   var qualifiesForMix: Bool { (rating ?? 0) >= 3 || isFavorite == true }
 }
 

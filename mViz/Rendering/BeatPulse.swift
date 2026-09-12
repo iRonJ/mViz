@@ -19,6 +19,11 @@ struct BeatPulse {
   private(set) var paletteHue: Float = 0
   private var targetPaletteHue: Float = 0
 
+  /// Current normalized beat envelope (peaks on onset, decaying smoothly over ~0.35s).
+  var beatIntensity: Float {
+    strength * exp(-age * 5)
+  }
+
   mutating func update(bass: Float, dt: Float, style: BeatLightingStyle) -> Float {
     switch style {
     case .off:
@@ -40,7 +45,7 @@ struct BeatPulse {
     beatTriggered = false
 
     // Beat onset detection (independent of lighting style, capped at 2 Hz for photosafety)
-    if cooldown >= 0.5 && bass > 0.08 && bass - previous > 0.015
+    if cooldown >= 0.5 && bass > 0.08 && bass - previous > 0.9 * dt
       && bass > baseline * 1.10
     {
       age = 0
@@ -59,13 +64,13 @@ struct BeatPulse {
     let smoothing = 1 - exp(-dt * 5.0)
     paletteHue += (targetPaletteHue - paletteHue) * smoothing
     if paletteHue >= 100.0 {
-      paletteHue = paletteHue.truncatingRemainder(dividingBy: 1.0)
-      targetPaletteHue = targetPaletteHue.truncatingRemainder(dividingBy: 1.0)
+      let turns = floor(paletteHue)
+      paletteHue -= turns
+      targetPaletteHue -= turns
     }
 
     let active = pulseWeight > 0.001 || strobeWeight > 0.001
     guard active else {
-      strength = 0
       return 0
     }
     let pulseVal = strength * exp(-age * 5)

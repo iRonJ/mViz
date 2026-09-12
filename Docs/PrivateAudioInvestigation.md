@@ -2,6 +2,16 @@
 
 Inspected September 12, 2026. Static inspection used the installed visionOS 26.5 SDK and locally cached device symbols for **visionOS 27.0 (24M5355a), RealityDevice14,1**. A subsequent real-headset diagnostic confirmed that exact running OS build, loaded the frameworks, and read Objective-C method type encodings. This is not a successful audio-capture experiment; no tap was started.
 
+## Follow-up hardware results
+
+The [matched control](audio-tap-control-visionOS27.txt) now establishes a concrete failure on visionOS 27.0 (24M5355a). With microphone permission granted and a recording-capable session, ordinary `AudioQueueNewInput` succeeds (`0`), while the processing-queue call used by `MPCProcessAudioTap` (flags `0x800`, observed in its disassembly) returns **`kAudioQueueErr_Permissions` (`-66676`)**. No queue is created by that call. The private wrapper nevertheless reports enabled; it receives zero frames while an independently running mViz engine renders an unprotected 440 Hz tone. This rules out Apple Music DRM or the wrong PID as necessary explanations for this particular failure. The exact additional service permission/entitlement remains unidentified; no access-control changes were attempted.
+
+The app now checks this failure before starting the expensive PID rotation, and terminates exhausted retries. A longer buffer timeout cannot fix this queue-creation error.
+
+The [cloud-analysis control](cloud-analysis-control-visionOS27.txt) compared an ordinary catalog request against the same song with `include=audio-analysis,flexml-analysis`, using the relationship names observed in MusicKit. **Both fail to obtain a developer token**, before relationship authorization can be evaluated. This is not evidence that these relationships are allowed or denied. Check MusicKit App Service registration for `TechronicApps.mViz`, then repeat the paired control. Apple documents [automatic token generation and App Service setup](https://developer.apple.com/documentation/musickit/using-automatic-token-generation-for-apple-music-api). Account configuration has not been inspected, so missing configuration versus another token-service failure remains unresolved.
+
+The remainder records the earlier symbol investigation and hypotheses, not successful PCM access.
+
 ## Most useful new lead: Apple's internal spectrum observer and process tap
 
 The cached device's `MediaPlaybackCore.framework` exports these Objective-C classes. Local `nm` method symbols identify the following selectors:

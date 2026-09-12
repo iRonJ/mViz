@@ -94,3 +94,12 @@ struct MotionRate {
   func advance(_ dt: Float) -> Float { dt * multiplier }
   func velocity(_ value: Float) -> Float { value * multiplier }
 }
+
+/// Limit each emitter to approximately 1,200 living particles at steady state.
+/// Orbit/stage transition weights share this budget; Flurry has its own smaller bound.
+enum ParticleBudget {
+  static func birthRate(requested: Float, lifeSpan: Double) -> Float {
+    guard requested.isFinite, lifeSpan.isFinite else { return 0 }
+    return max(0, min(requested, min(900, 1200 / Float(max(0.1, lifeSpan)))))
+  }
+}

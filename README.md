@@ -130,3 +130,11 @@ sh Tests/run-playback-checks.sh
 
 - [Apple Music Audio Access & Investigation](Docs/AppleMusicAudioAccess.md): Comprehensive findings on visionOS audio APIs and system tap constraints.
 - [Private Audio Investigation](Docs/PrivateAudioInvestigation.md): Analysis of CoreAudio and ProcessAssertion tap possibilities.
+
+## Latest audio review
+
+Particle size is adjustable from 25–200%, with a 70% default. Fog/Supernova density and transitions now respect a bounded particle budget. Music Library loading no longer cancels itself during device-file discovery (100 songs verified on Vision Pro).
+
+See [the reactivity review](Docs/AudioReactivityReview.md) and [private audio results](Docs/PrivateAudioInvestigation.md): ordinary recording succeeds, but the private processing queue returns a permissions error on the tested headset. Cloud beat/loudness metadata remains blocked at developer-token acquisition.
+
+**Logarithmic audio response** is enabled by default in Settings. It applies a normalized `log1p(9x)` curve to sensitivity-adjusted visual levels, lifting quieter details with a small near-silence floor. Particle dynamics and GEQ meters share the mapping; beat detection retains the linear amplitude envelope. Turn the toggle off for the previous linear response.

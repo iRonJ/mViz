@@ -25,17 +25,51 @@ struct MusicBrowserView: View {
           .textFieldStyle(.roundedBorder)
         List {
           if deviceFiles {
+            if !player.deviceTracks.isEmpty {
+              Section {
+                Button(action: {
+                  Task { await player.importAllDeviceTracks() }
+                }) {
+                  Label("Import All to Playlist (\(player.deviceTracks.count) songs)", systemImage: "arrow.down.circle.fill")
+                }
+                .disabled(player.importing)
+              }
+            }
             ForEach(
               player.deviceTracks.filter {
                 search.isEmpty || ($0.title ?? "").localizedCaseInsensitiveContains(search)
+                  || ($0.artist ?? "").localizedCaseInsensitiveContains(search)
               }, id: \.persistentID
             ) { item in
-              Button("Import \(item.title ?? "Song") • \(item.rating)★") {
-                Task {
-                  await player.importDeviceTrack(item)
-                  player.libraryMessage = player.message
+              HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(item.title ?? "Song").font(.body)
+                  HStack(spacing: 6) {
+                    Text(item.artist ?? "Unknown artist").font(.caption).foregroundStyle(.secondary)
+                    Label("Direct Audio", systemImage: "waveform")
+                      .font(.caption2)
+                      .foregroundStyle(.cyan)
+                  }
                 }
-              }.disabled(player.importing)
+                Spacer()
+                if player.isTrackCached(item) != nil {
+                  Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                } else {
+                  Button("Import") {
+                    Task {
+                      await player.importDeviceTrack(item)
+                      player.libraryMessage = player.message
+                    }
+                  }
+                  .buttonStyle(.bordered)
+                  .disabled(player.importing)
+                }
+                Button("Play") {
+                  Task { await player.playDeviceTrack(item, model: model) }
+                }
+                .buttonStyle(.borderedProminent)
+              }
             }
           } else {
             ForEach(
@@ -44,14 +78,26 @@ struct MusicBrowserView: View {
                   || $0.artistName.localizedCaseInsensitiveContains(search)
               }
             ) { song in
+              let nonDRM = player.nonDRMItem(for: song)
               HStack {
-                VStack(alignment: .leading) {
-                  Text(song.title)
-                  Text(song.artistName).font(.caption).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(song.title).font(.body)
+                  HStack(spacing: 6) {
+                    Text(song.artistName).font(.caption).foregroundStyle(.secondary)
+                    if nonDRM != nil {
+                      Label("DRM-Free • Direct Audio", systemImage: "waveform")
+                        .font(.caption2)
+                        .foregroundStyle(.cyan)
+                    } else {
+                      Label("Apple Music", systemImage: "apple.logo")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                  }
                 }
                 Spacer()
                 Button("Play") { Task { await player.playAppleMusic(song, model: model) } }
-                  .disabled(player.musicStarting || song.playParameters == nil)
+                  .disabled(player.musicStarting || (nonDRM == nil && song.playParameters == nil))
               }
             }
             if player.libraryHasMore {

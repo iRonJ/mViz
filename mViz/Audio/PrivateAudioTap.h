@@ -21,6 +21,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)stop;
 - (NSString *)tapIvarsSummary;
 + (NSString *)runDiagnosticProbe;
++ (NSString *)probeProcessingQueue;
++ (int)processingQueueCreationStatus;
 
 @end
 

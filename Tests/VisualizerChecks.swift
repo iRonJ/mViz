@@ -154,3 +154,55 @@ for mode in MotionMode.allCases {
 }
 
 print("PASS: stage symmetry, speed, reversing motion, spectral colors, strobe rate limit, and lighting mode transitions with smooth fade")
+
+// Identical bass ramps should trigger beats at different headset frame rates.
+for fps: Float in [60, 90, 120] {
+    var detector = BeatPulse()
+    var count = 0
+    for frame in 0..<Int(fps * 8) {
+        let time = Float(frame) / fps
+        let phase = time.truncatingRemainder(dividingBy: 0.75)
+        let bass: Float = phase < 0.1 ? phase * 6 : max(0, 0.6 - (phase - 0.1) * 3)
+        _ = detector.update(bass: bass, dt: 1 / fps, style: .off)
+        if detector.beatTriggered { count += 1 }
+    }
+    precondition(count >= 9 && count <= 11, "Frame-rate-dependent beat detection at \(fps): \(count)")
+}
+print("PASS: bass onset detection at 60/90/120 Hz with lighting off")
+
+var beatIntensityDetector = BeatPulse()
+_ = beatIntensityDetector.update(bass: 0, dt: 0.1, style: .off)
+precondition(beatIntensityDetector.beatIntensity == 0)
+_ = beatIntensityDetector.update(bass: 1.0, dt: 0.1, style: .off)
+precondition(beatIntensityDetector.beatTriggered)
+precondition(beatIntensityDetector.beatIntensity > 0.8, "Beat intensity did not pulse on onset")
+_ = beatIntensityDetector.update(bass: 0.2, dt: 0.2, style: .off)
+precondition(beatIntensityDetector.beatIntensity < 0.6, "Beat intensity did not decay exponentially")
+print("PASS: beat intensity envelope and decay for particle brightness pulse")
+
+for mode in MotionMode.allCases {
+    let dynamics = mode.definition.dynamics(bass: 1)
+    precondition(dynamics.birthBoost <= 1, "Mode density accidentally interpreted as a large multiplier")
+    for speed: Float in [0.25, 1, 3] {
+        let lifetime = (dynamics.lifeSpan ?? 2.5) / Double(sqrt(speed))
+        let rate = ParticleBudget.birthRate(requested: 100000, lifeSpan: lifetime)
+        precondition(rate * Float(lifetime) <= 1200.01)
+    }
+}
+print("PASS: bounded particle populations across loud modes and motion speeds")
+
+precondition(AudioLevelCurve.map(0, logarithmic: true) == 0)
+precondition(AudioLevelCurve.map(0.001, logarithmic: true) == 0)
+precondition(abs(AudioLevelCurve.map(1, logarithmic: true) - 1) < 0.00001)
+precondition(AudioLevelCurve.map(.nan, logarithmic: true) == 0)
+var previousLevel: Float = 0
+for step in 0...1000 {
+    let level = Float(step) / 1000
+    let mapped = AudioLevelCurve.map(level, logarithmic: true)
+    precondition(mapped >= previousLevel && mapped <= 1)
+    precondition(AudioLevelCurve.map(level, logarithmic: false) == level)
+    previousLevel = mapped
+}
+precondition(AudioLevelCurve.map(0.1, logarithmic: true) > 0.25)
+precondition(AudioLevelCurve.map(0.5, logarithmic: true) > 0.7)
+print("PASS: log response endpoints, noise floor, monotonicity, quiet-detail lift, and linear comparison")

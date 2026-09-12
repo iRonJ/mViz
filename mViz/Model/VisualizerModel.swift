@@ -72,7 +72,9 @@ final class VisualizerModel {
     }
   }
   var sensitivity: Float = 3
+  var logarithmicLevels = true
   var intensity: Float = 0.7
+  var particleSize: Float = 0.7
   var demo = false
   var isImmersed = false
   var transitioning = false
@@ -184,7 +186,8 @@ final class VisualizerModel {
       try? session.setCategory(.playback, mode: .default)
       try? session.setActive(true)
       if !library.appleMusicActive {
-        status = "Playing • \(library.tracks.first(where: { $0.id == library.currentID })?.title ?? "Playlist")"
+        status =
+          "Playing • \(library.tracks.first(where: { $0.id == library.currentID })?.title ?? "Playlist")"
       }
     } else {
       bandStorage.bands = .zero

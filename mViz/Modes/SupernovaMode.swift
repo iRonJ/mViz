@@ -31,7 +31,7 @@ struct SupernovaMode: MotionPattern {
       speedBoost: 0.25 + bass * 0.65, // relativistic acceleration on bass drops
       gravity: 0,
       spreadBoost: 0.15 + bass * 0.3,
-      birthBoost: 80 * bass,
+      birthBoost: 0.8 * bass,
       lifeSpan: 2.2,
       stretch: 2.2 + bass * 1.2, // relativistic streak distortion
       sizeScale: 1.15 + bass * 0.4,

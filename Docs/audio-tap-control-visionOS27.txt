@@ -1,0 +1,9 @@
+Own-process unprotected tone control
+Version 27.0 (Build 24M5355a)
+Record-capable session: AVAudioSessionCategoryPlayAndRecord, recordPermission=1735552628
+AudioQueueNewInput: normal flags=0 status=0; processing flags=0x800 status=-66676 hex=0xfffefb8c
+before tap: engineRunning=true, playerPlaying=true
+start=true; Tap active for PID 1681 (PID 1681, 48000 Hz, 1 ch); awaiting samples
+after tap: engineRunning=true, playerPlaying=true
+engineRunning=true, playerTime=Optional(241440)
+frames=0, peak=0.0

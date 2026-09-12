@@ -7,6 +7,9 @@ struct VisualizerControls: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       Toggle("Show surroundings", isOn: $model.passthrough)
+      Toggle("Logarithmic audio response", isOn: $model.logarithmicLevels)
+      Text("Lifts quieter musical details. Turn off to compare with linear response.")
+        .font(.caption).foregroundStyle(.secondary)
       Picker(
         "Movement",
         selection: Binding(
@@ -35,8 +38,13 @@ struct VisualizerControls: View {
       Picker("Particle style", selection: $model.particleStyle) {
         ForEach(ParticleStyle.allCases) { style in Text(style.rawValue).tag(style) }
       }
+      HStack {
+        Text("Particle size \(Int((model.particleSize * 100).rounded()))%").monospacedDigit()
+        Slider(value: $model.particleSize, in: 0.25...2, step: 0.05)
+          .accessibilityLabel("Particle size")
+      }
       if model.activeMotion == .line || model.activeMotion == .grid || model.motion == .line
-        || model.motion == .grid
+        || model.motion == .grid || model.activeMotion == .flurry || model.motion == .flurry
       {
         Button("Center stage in front of me", systemImage: "scope") { model.recenterStage += 1 }
       }
@@ -44,8 +52,10 @@ struct VisualizerControls: View {
         ForEach(BeatLightingStyle.allCases) { style in Text(style.rawValue).tag(style) }
       }
       if model.beatLighting == .evolving {
-        Text("Transitions with movement • current mode: \(model.activeMotion.definition.lightingStyle.rawValue)")
-          .font(.caption).foregroundStyle(.secondary)
+        Text(
+          "Transitions with movement • current mode: \(model.activeMotion.definition.lightingStyle.rawValue)"
+        )
+        .font(.caption).foregroundStyle(.secondary)
       }
       if model.beatLighting != .off {
         HStack {
@@ -64,8 +74,10 @@ struct VisualizerControls: View {
           Text("Audio sync delay \(model.audioDelay, specifier: "%.2f")s").monospacedDigit()
           Slider(value: $model.audioDelay, in: 0...0.6, step: 0.01)
         }
-        Text("Compensates for graphics pipeline latency so visual beats land precisely on the beat.")
-          .font(.caption).foregroundStyle(.secondary)
+        Text(
+          "Compensates for graphics pipeline latency so visual beats land precisely on the beat."
+        )
+        .font(.caption).foregroundStyle(.secondary)
       }
     }
   }

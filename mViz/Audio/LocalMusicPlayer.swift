@@ -151,6 +151,13 @@ final class LocalMusicPlayer {
       return
     }
     libraryMessage = "Loading your music library…"
+    if deviceTracks.isEmpty {
+      Task { [weak self] in
+        let items = await Task.detached { MPMediaQuery.songs().items }.value
+        guard let self, self.libraryRequestID == requestID, let items else { return }
+        self.deviceTracks = items.filter { !$0.hasProtectedAsset && !$0.isCloudItem && $0.assetURL != nil }
+      }
+    }
     do {
       var request = MusicLibraryRequest<Song>()
       request.limit = 100
@@ -166,11 +173,30 @@ final class LocalMusicPlayer {
       libraryMessage =
         librarySongs.isEmpty
         ? "Your music library returned no songs. Check that Music is signed in and your library is synced on this Vision Pro, or import audio from Files."
-        : "\(librarySongs.count) songs • Apple Music playback uses demo visuals unless you enable the microphone."
+        : "\(librarySongs.count) songs • Select a song to play. Microphone supplies reactive audio when a direct source is unavailable."
     } catch {
       guard requestID == libraryRequestID else { return }
       libraryMessage =
         "Couldn’t load Music Library: \(error.localizedDescription). Try again or import from Files."
+    }
+  }
+
+  func nonDRMItem(for song: Song) -> MPMediaItem? {
+    let cleanSongTitle = song.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let cleanArtist = song.artistName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    return deviceTracks.first { item in
+      guard let itemTitle = item.title?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+            !item.hasProtectedAsset,
+            item.assetURL != nil
+      else { return false }
+      if itemTitle == cleanSongTitle {
+        if cleanArtist.isEmpty { return true }
+        if let itemArtist = item.artist?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+          return itemArtist == cleanArtist || itemArtist.contains(cleanArtist) || cleanArtist.contains(itemArtist)
+        }
+        return true
+      }
+      return false
     }
   }
 
@@ -212,6 +238,11 @@ final class LocalMusicPlayer {
 
   func playAppleMusic(_ song: Song, model: VisualizerModel) async {
     guard !musicStarting else { return }
+    // Smart Hybrid check: if this song is non-DRM in the user's media library, play in-process with zero-mic direct analysis!
+    if let nonDRM = nonDRMItem(for: song) {
+      await playDeviceTrack(nonDRM, model: model)
+      return
+    }
     model.stop()
     let request = generation
     musicStarting = true
@@ -240,10 +271,19 @@ final class LocalMusicPlayer {
       model.status = "Apple Music • \(song.title)"
 #if DEBUG
       let tap = MVPrivateAudioTap()
-      var tapAnalyzer = BandAnalyzer()
-      let tapHandler: @convention(block) (UnsafePointer<Float>?, UInt32) -> Void = { [weak model] samples, count in
-        guard let model, let samples, count > 0 else { return }
-        let (macro, geq10) = tapAnalyzer.processDetailed(samples, count: Int(count), sampleRate: 48000)
+      var tapAnalyzers = [BandAnalyzer(), BandAnalyzer()]
+      let tapHandler: @convention(block) (UnsafePointer<Float>?, UInt32) -> Void = { [weak model, weak tap] samples, count in
+        guard let model, let tap, let samples, count > 0 else { return }
+        let channels = Int(tap.numberOfChannels)
+        guard (1...2).contains(channels), tap.sampleRate > 0 else { return }
+        var macro = SIMD3<Float>.zero
+        var geq10 = SIMD16<Float>.zero
+        for channel in 0..<channels {
+          let measured = tapAnalyzers[channel].processDetailed(
+            samples.advanced(by: channel), count: Int(count), sampleRate: Double(tap.sampleRate), stride: channels)
+          for band in 0..<3 { macro[band] = max(macro[band], measured.macro[band]) }
+          for band in 0..<10 { geq10[band] = max(geq10[band], measured.geq10[band]) }
+        }
         model.bandStorage.bands = macro
         model.bandStorage.bands10 = geq10
       }
@@ -261,12 +301,13 @@ final class LocalMusicPlayer {
         self.audioTapSource = "Direct Tap • \(target) (buffering…)"
         NSLog("MVPrivateAudioTap active for Apple Music: %@", tap.diagnostic)
       } else {
-        self.audioTapSource = "Acoustic Tap (Microphone Fallback)"
+        self.audioTapSource = "Microphone fallback • direct tap unavailable"
         NSLog("MVPrivateAudioTap unavailable: %@", tap.diagnostic)
       }
 #endif
       var monitorTicks = 0
       var strategyRotationTicks = 0
+      var strategiesExhausted = false
       musicMonitor = Task { @MainActor [weak self, weak model] in
         while !Task.isCancelled {
           try? await Task.sleep(for: .milliseconds(300))
@@ -290,7 +331,7 @@ final class LocalMusicPlayer {
             if model?.listening == true {
               model?.stopListening()
             }
-          } else if self.isPlaying && !self.userStoppedMicrophone {
+          } else if self.isPlaying && !self.userStoppedMicrophone && !strategiesExhausted {
             let elapsed = Double(monitorTicks) * 0.3
             let playbackTime = music.playbackTime
             if playbackTime < 0.25 {
@@ -306,6 +347,9 @@ final class LocalMusicPlayer {
                 strategyRotationTicks = 0
                 let switched = self.privateTap?.switchToNextStrategy(handler: tapHandler) ?? false
                 if !switched {
+                  strategiesExhausted = true
+                  self.privateTap?.stop()
+                  self.audioTapSource = "Microphone fallback • direct tap unavailable"
                   if model?.listening != true && !self.userStoppedMicrophone {
                     self.audioTapSource = "Acoustic Tap (Microphone Fallback)"
                     await model?.start()
@@ -348,8 +392,24 @@ final class LocalMusicPlayer {
       playbackQueue(appleQueueSnapshot, through: current.id, autoplay: autoplay))
   }
 
-  func importDeviceTrack(_ item: MPMediaItem) async {
-    guard !importing, let url = item.assetURL, !item.hasProtectedAsset else { return }
+  func isTrackCached(_ item: MPMediaItem) -> LocalTrack? {
+    tracks.first { track in
+      if let pid = track.persistentID, pid == item.persistentID {
+        return FileManager.default.fileExists(atPath: Self.directory.appendingPathComponent(track.filename).path)
+      }
+      if track.title == (item.title ?? "") {
+        return FileManager.default.fileExists(atPath: Self.directory.appendingPathComponent(track.filename).path)
+      }
+      return false
+    }
+  }
+
+  @discardableResult
+  func importDeviceTrack(_ item: MPMediaItem) async -> LocalTrack? {
+    if let cached = isTrackCached(item) {
+      return cached
+    }
+    guard !importing, let url = item.assetURL, !item.hasProtectedAsset else { return nil }
     importing = true
     defer { importing = false }
     do {
@@ -367,12 +427,47 @@ final class LocalMusicPlayer {
         try? FileManager.default.removeItem(at: destination)
         throw error
       }
-      tracks.append(
-        LocalTrack(
-          id: id, title: item.title ?? "Device song", filename: filename, rating: item.rating))
+      let track = LocalTrack(
+        id: id,
+        title: item.title ?? "Device song",
+        filename: filename,
+        rating: item.rating,
+        persistentID: item.persistentID
+      )
+      tracks.append(track)
       message = "Imported \(item.title ?? "song") with its \(item.rating)★ rating."
       save()
-    } catch { message = "Couldn’t import device song: \(error.localizedDescription)" }
+      return track
+    } catch {
+      message = "Couldn’t import device song: \(error.localizedDescription)"
+      return nil
+    }
+  }
+
+  func playDeviceTrack(_ item: MPMediaItem, model: VisualizerModel) async {
+    if let cached = isTrackCached(item) {
+      play(cached, model: model)
+      return
+    }
+    model.status = "Preparing direct audio for \(item.title ?? "song")…"
+    if let newTrack = await importDeviceTrack(item) {
+      play(newTrack, model: model)
+    } else {
+      model.status = "Unable to prepare \(item.title ?? "song"). Check DRM status."
+    }
+  }
+
+  func importAllDeviceTracks() async {
+    guard !importing else { return }
+    var count = 0
+    for item in deviceTracks {
+      if isTrackCached(item) == nil {
+        if await importDeviceTrack(item) != nil {
+          count += 1
+        }
+      }
+    }
+    libraryMessage = "Imported \(count) new device tracks (\(tracks.count) total in playlist)."
   }
 
   func play(_ track: LocalTrack, model: VisualizerModel) {

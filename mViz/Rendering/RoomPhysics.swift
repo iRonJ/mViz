@@ -37,6 +37,9 @@ extension ParticleField {
         roomParticles[index].age += dt
         let age = roomParticles[index].age
         let particle = roomParticles[index].entity
+        if particle.scale.x != model.particleSize {
+          particle.scale = SIMD3(repeating: model.particleSize)
+        }
         if age > 5 || particle.position.y < -3 {
           particle.isEnabled = false
         } else {
@@ -60,6 +63,7 @@ extension ParticleField {
       guard let index = roomParticles.firstIndex(where: { !$0.entity.isEnabled }) else { break }
       let particle = roomParticles[index].entity
       let angle = time * 1.4 + Float(index) * 2.39996
+      particle.scale = SIMD3(repeating: model.particleSize)
       particle.position = [cos(angle) * 1.1, 1.8 + envelope.x * 0.3, sin(angle) * 1.1]
       particle.components.set(OpacityComponent(opacity: 1))
       if roomMaterials.count == 8 {
@@ -67,7 +71,10 @@ extension ParticleField {
       }
       particle.components.set(
         PhysicsMotionComponent(
-          linearVelocity: [cos(angle) * (0.8 + bassPunch * 0.6), 0.6 + bassPunch * 2.2, sin(angle) * (0.8 + bassPunch * 0.6)]
+          linearVelocity: [
+            cos(angle) * (0.8 + bassPunch * 0.6), 0.6 + bassPunch * 2.2,
+            sin(angle) * (0.8 + bassPunch * 0.6),
+          ]
             * MotionRate(model.motionSpeed).multiplier))
       roomParticles[index].age = 0
       particle.isEnabled = true

@@ -4,6 +4,8 @@
 #import <dlfcn.h>
 #import <unistd.h>
 #import <sys/sysctl.h>
+#import <AudioToolbox/AudioToolbox.h>
+#import <stdatomic.h>
 
 @interface NSObject (MVProcessTapSignatures)
 - (id)initWithPID:(int)pid refreshRate:(id)refreshRate delegate:(id)delegate;
@@ -38,6 +40,10 @@ static void logTapDebug(NSString *message) {
   }
 }
 
+static void MVQueueControlCallback(void *context, AudioQueueRef queue, AudioQueueBufferRef buffer,
+                                 const AudioTimeStamp *time, UInt32 packets,
+                                 const AudioStreamPacketDescription *descriptions) { }
+
 static pid_t findProcessByName(const char *name) {
   int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
   size_t size = 0;
@@ -68,9 +74,9 @@ static pid_t findProcessByName(const char *name) {
   id _tap;
   void (^_handler)(const float *, uint32_t);
   NSString *_diagnostic;
-  uint64_t _samplesReceivedCount;
-  uint32_t _sampleRate;
-  uint32_t _numberOfChannels;
+  _Atomic(uint64_t) _samplesReceivedCount;
+  _Atomic(uint32_t) _sampleRate;
+  _Atomic(uint32_t) _numberOfChannels;
   int _activePID;
   NSString *_activeTargetName;
   int _currentStrategyIndex;
@@ -87,6 +93,15 @@ static pid_t findProcessByName(const char *name) {
 
 - (BOOL)startDefaultWithHandler:(void (^)(const float *, uint32_t))handler {
   _currentStrategyIndex = 0;
+#if DEBUG
+  int queueStatus = [MVPrivateAudioTap processingQueueCreationStatus];
+  if (queueStatus != noErr) {
+    _diagnostic = [NSString stringWithFormat:@"Processing queue unavailable: OSStatus %d%@", queueStatus,
+                   queueStatus == kAudioQueueErr_Permissions ? @" (permission denied)" : @""];
+    logTapDebug(_diagnostic);
+    return NO;
+  }
+#endif
   logTapDebug(@"[startDefault] Starting tap strategy rotation from Strategy 0...");
   return [self tryStrategyAtIndex:0 handler:handler];
 }
@@ -255,12 +270,7 @@ static pid_t getMusicPlayerServerPID(void) {
       return NO;
     }
 
-    if ([_tap respondsToSelector:@selector(setNumberOfFrames:)]) {
-      [_tap setNumberOfFrames:1024];
-    }
-    if ([_tap respondsToSelector:@selector(setEnabled:)]) {
-      [_tap setEnabled:YES];
-    }
+    // The initializer owns queue format/buffer sizing. Do not mutate those afterward.
     [_tap start];
 
     BOOL enabled = YES;
@@ -371,6 +381,35 @@ static pid_t getMusicPlayerServerPID(void) {
   [out appendFormat:@"MPCProcessAudioTap available: %@\n", tapCls ? @"YES" : @"NO"];
 
   return out;
+}
+
++ (int)queueCreationStatusWithFlags:(UInt32)flags {
+#if DEBUG
+  // Reproduce only the queue-creation call observed in MPCProcessAudioTap.
+  // No buffers are enqueued and no audio is recorded by this diagnostic.
+  AudioStreamBasicDescription format = {0};
+  format.mSampleRate = 48000;
+  format.mFormatID = kAudioFormatLinearPCM;
+  format.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
+  format.mBytesPerPacket = 4;
+  format.mFramesPerPacket = 1;
+  format.mBytesPerFrame = 4;
+  format.mChannelsPerFrame = 1;
+  format.mBitsPerChannel = 32;
+  AudioQueueRef queue = NULL;
+  OSStatus status = AudioQueueNewInput(&format, MVQueueControlCallback, NULL, NULL, NULL, flags, &queue);
+  if (queue) AudioQueueDispose(queue, true);
+  return status;
+#else
+  return kAudioQueueErr_Permissions;
+#endif
+}
+
++ (int)processingQueueCreationStatus { return [self queueCreationStatusWithFlags:0x800]; }
+
++ (NSString *)probeProcessingQueue {
+  int status = [self processingQueueCreationStatus];
+  return [NSString stringWithFormat:@"AudioQueueNewInput: normal flags=0 status=%d; processing flags=0x800 status=%d hex=0x%08x", [self queueCreationStatusWithFlags:0], status, (unsigned int)status];
 }
 
 @end

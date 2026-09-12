@@ -23,6 +23,7 @@
 		A1B2C3D4E5F6000200000002 /* SupernovaMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000200000001; };
 		A1B2C3D4E5F6000300000002 /* AppleMusicURLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000300000001; };
 		A1B2C3D4E5F6000400000002 /* QueuedTrack.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000400000001; };
+		A1B2C3D4E5F6000600000002 /* PrivateAudioTap.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000600000001; };
 		0F9D261E11741851D32E4364 /* AudioColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7F92CC74508C1FEDB77A1EC; };
 		4D04B8E2AE2A5D51126A77FF /* MotionBlend.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4D3CE37449835E8E5A89C75; };
 		87793C8178F9ADEAB62536D1 /* ParticleAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 470D4BD0CB61AE3D38BE762B; };
@@ -63,6 +64,9 @@
 		A1B2C3D4E5F6000200000001 /* SupernovaMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupernovaMode.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000300000001 /* AppleMusicURLParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleMusicURLParser.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000400000001 /* QueuedTrack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueuedTrack.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000500000001 /* PrivateAudioTap.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PrivateAudioTap.h; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000600000001 /* PrivateAudioTap.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PrivateAudioTap.m; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000700000001 /* mViz-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "mViz-Bridging-Header.h"; sourceTree = "<group>"; };
 		B7F92CC74508C1FEDB77A1EC /* AudioColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioColor.swift; sourceTree = "<group>"; };
 		D4D3CE37449835E8E5A89C75 /* MotionBlend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionBlend.swift; sourceTree = "<group>"; };
 		470D4BD0CB61AE3D38BE762B /* ParticleAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticleAppearance.swift; sourceTree = "<group>"; };
@@ -102,7 +106,7 @@
 /* Begin PBXGroup section */
 		99774E380E14BFE3E356C50D = {isa = PBXGroup; children = (68D437D421A16D4F381E66A5, 5C52A340E1495D378EBB7463, 07AAF3062175EEC225798F8D, E4E8B1EF7879F567E32691FF, 927B409E535AC9A613156809, 6737252BE912A6835CDE1F6B, AB3BE47C54E2FB388630FAD8, FFFC054FB23D3F9A9B65498D, 31D9FF551B8F4A795166C217, D3B8FE2092FF6B67A3FF20B6, A1B2C3D4E5F6000100000001, A1B2C3D4E5F6000200000001,1E822BF109C44F921A12C783,); path = Modes; sourceTree = "<group>"; };
 		30D7E8FE33F23654D8A0AC41 = {isa = PBXGroup; children = (55965257947DFD770BEE2878, AF6B111B2645F2C98600A013, B7F92CC74508C1FEDB77A1EC, D4D3CE37449835E8E5A89C75, 470D4BD0CB61AE3D38BE762B, 01247ABC2D2A73AE289A0030, 033587C56ADC011B7E00B003,D1B8D799324431390C9B1AFB,); path = Rendering; sourceTree = "<group>"; };
-		ED8A6292A9ECF7DC216CC942 = {isa = PBXGroup; children = (FFCFD67661E2E7B98CECF830, CA5EACAF13B01182E219F01B, 6A5864DF435599382F2C28B4, A1B2C3D4E5F6000300000001,CD65A06281E1BEF2C6117BF8,); path = Audio; sourceTree = "<group>"; };
+		ED8A6292A9ECF7DC216CC942 = {isa = PBXGroup; children = (FFCFD67661E2E7B98CECF830, CA5EACAF13B01182E219F01B, 6A5864DF435599382F2C28B4, A1B2C3D4E5F6000300000001,CD65A06281E1BEF2C6117BF8, A1B2C3D4E5F6000500000001, A1B2C3D4E5F6000600000001,); path = Audio; sourceTree = "<group>"; };
 		AC64880DAB13448F132866D4 = {isa = PBXGroup; children = (42ADB9BCC8C8DC23B9C23058, 5DF7AB9818F202A3F5EB758D, 5CA449C3FE2A8C8479C56E98, 9E1A2B3C4D5E6F7A8B9C0D1E,); path = Views; sourceTree = "<group>"; };
 		3832C565B785E49A7F29F0ED = {isa = PBXGroup; children = (DDA168CFADA513F2E885AF7E, A1B2C3D4E5F6000400000001,); path = Model; sourceTree = "<group>"; };
 		60EE3E512B9BC4E00044B380 = {
@@ -135,6 +139,7 @@
 				60EE3E652B9BC4E00044B380 /* ImmersiveView.swift */,
 				60EE3E672B9BC4E20044B380 /* Assets.xcassets */,
 				60EE3E6C2B9BC4E20044B380 /* Info.plist */,
+				A1B2C3D4E5F6000700000001 /* mViz-Bridging-Header.h */,
 				60EE3E692B9BC4E20044B380 /* Preview Content */,
 			);
 			path = mViz;
@@ -262,6 +267,7 @@
 				A1B2C3D4E5F6000200000002 /* SupernovaMode.swift in Sources */,
 				A1B2C3D4E5F6000300000002 /* AppleMusicURLParser.swift in Sources */,
 				A1B2C3D4E5F6000400000002 /* QueuedTrack.swift in Sources */,
+				A1B2C3D4E5F6000600000002 /* PrivateAudioTap.m in Sources */,
 				60EE3E662B9BC4E00044B380 /* ImmersiveView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -409,6 +415,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "mViz/mViz-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 7;
 				XROS_DEPLOYMENT_TARGET = 26.0;
@@ -436,6 +443,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "mViz/mViz-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 7;
 				XROS_DEPLOYMENT_TARGET = 26.0;

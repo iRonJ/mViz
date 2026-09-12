@@ -6,14 +6,15 @@ import SwiftUI
 struct mVizApp: App {
   @State private var model = VisualizerModel()
 
+  init() {
+    #if DEBUG
+      AudioAPIDiagnostics.run()
+    #endif
+  }
+
   var body: some Scene {
     WindowGroup {
       ContentView(model: model)
-        .task {
-          #if DEBUG
-            AudioAPIDiagnostics.runIfRequested()
-          #endif
-        }
     }
     .defaultSize(width: 560, height: 740)
 

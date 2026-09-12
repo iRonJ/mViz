@@ -120,10 +120,11 @@ final class VisualizerModel {
   }
 
   func start() async {
-    stop(preserveMusic: library.appleMusicActive)
+    stop(preserveMusic: library.appleMusicActive || library.isPlaying)
+    library.userStoppedMicrophone = false
     demo = false
     let request = generation
-    if !library.appleMusicActive {
+    if !library.appleMusicActive && !library.isPlaying {
       status = "Requesting microphone access…"
     }
     let allowed = await AVAudioApplication.requestRecordPermission()
@@ -157,12 +158,41 @@ final class VisualizerModel {
       capture.prepare()
       try capture.start()
       listening = true
-      if !library.appleMusicActive {
+      if !library.appleMusicActive && !library.isPlaying {
         status = "Listening • \(session.currentRoute.inputs.first?.portName ?? "Microphone")"
       }
     } catch {
-      stop()
+      stop(preserveMusic: library.appleMusicActive || library.isPlaying)
       status = "Couldn’t start microphone: \(error.localizedDescription)"
+    }
+  }
+
+  /// Stops only the microphone capture without interrupting music playback or deactivating the audio session.
+  func stopListening() {
+    generation += 1
+    library.userStoppedMicrophone = true
+    if let engine {
+      engine.stop()
+      if tapInstalled { engine.inputNode.removeTap(onBus: 0) }
+    }
+    tapInstalled = false
+    engine = nil
+    listening = false
+
+    if library.appleMusicActive || library.isPlaying {
+      let session = AVAudioSession.sharedInstance()
+      try? session.setCategory(.playback, mode: .default)
+      try? session.setActive(true)
+      if !library.appleMusicActive {
+        status = "Playing • \(library.tracks.first(where: { $0.id == library.currentID })?.title ?? "Playlist")"
+      }
+    } else {
+      bandStorage.bands = .zero
+      bandStorage.bands10 = .zero
+      geqLevels = .zero
+      geq10Levels = .zero
+      try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+      status = "Microphone stopped"
     }
   }
 
@@ -176,13 +206,17 @@ final class VisualizerModel {
     tapInstalled = false
     engine = nil
     listening = false
-    bandStorage.bands = .zero
-    bandStorage.bands10 = .zero
-    geqLevels = .zero
-    geq10Levels = .zero
     if !preserveMusic {
+      bandStorage.bands = .zero
+      bandStorage.bands10 = .zero
+      geqLevels = .zero
+      geq10Levels = .zero
       try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+      status = demo ? "Demo mode • no microphone needed" : "Audio stopped"
+    } else {
+      let session = AVAudioSession.sharedInstance()
+      try? session.setCategory(.playback, mode: .default)
+      try? session.setActive(true)
     }
-    status = demo ? "Demo mode • no microphone needed" : "Audio stopped"
   }
 }

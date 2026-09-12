@@ -19,6 +19,8 @@ final class LocalMusicPlayer {
   var libraryHasMore = false
   var appleMusicActive = false
   var musicStarting = false
+  var audioTapSource = "Direct file audio analysis (zero mic)"
+  var userStoppedMicrophone = false
   private var libraryRequestID = 0
   private var libraryOffset = 0
   private var musicMonitor: Task<Void, Never>?
@@ -35,6 +37,9 @@ final class LocalMusicPlayer {
   private var delayNode: AVAudioUnitDelay?
   private var generation = 0
   private var tapInstalled = false
+#if DEBUG
+  private var privateTap: MVPrivateAudioTap?
+#endif
 
   func setAudioDelay(_ delay: Double) {
     delayNode?.delayTime = TimeInterval(max(0, min(2, delay)))
@@ -214,6 +219,9 @@ final class LocalMusicPlayer {
     model.status = "Starting Apple Music…"
     defer { musicStarting = false }
     do {
+      let session = AVAudioSession.sharedInstance()
+      try? session.setCategory(.playback, mode: .default)
+      try? session.setActive(true)
       let music = ApplicationMusicPlayer.shared
       // Freeze the loaded library order. MusicKit alone advances this queue.
       let songs = librarySongs.contains(where: { $0.id == song.id }) ? librarySongs : [song]
@@ -230,11 +238,31 @@ final class LocalMusicPlayer {
       }
       isPlaying = true
       model.status = "Apple Music • \(song.title)"
+#if DEBUG
+      let tap = MVPrivateAudioTap()
+      var tapAnalyzer = BandAnalyzer()
+      let tapStarted = tap.startDefault { [weak model] samples, count in
+        guard let model, count > 0 else { return }
+        let (macro, geq10) = tapAnalyzer.processDetailed(samples, count: Int(count), sampleRate: 48000)
+        model.bandStorage.bands = macro
+        model.bandStorage.bands10 = geq10
+      }
+      if tapStarted {
+        self.privateTap = tap
+        self.audioTapSource = "Direct Tap (connecting…)"
+        NSLog("MVPrivateAudioTap active for Apple Music: %@", tap.diagnostic)
+      } else {
+        self.audioTapSource = "Acoustic Tap (Microphone Fallback)"
+        NSLog("MVPrivateAudioTap unavailable: %@", tap.diagnostic)
+      }
+#endif
+      var monitorTicks = 0
       musicMonitor = Task { @MainActor [weak self, weak model] in
         while !Task.isCancelled {
           try? await Task.sleep(for: .milliseconds(300))
           guard !Task.isCancelled, let self, self.appleMusicActive, self.generation == request
           else { return }
+          monitorTicks += 1
           let state = music.state.playbackStatus
           self.isPlaying = state == .playing
           self.isPaused = state == .paused || state == .interrupted
@@ -244,6 +272,25 @@ final class LocalMusicPlayer {
               model?.status = displayStatus
             }
           }
+#if DEBUG
+          let count = self.privateTap?.samplesReceivedCount ?? 0
+          if count > 0 {
+            self.audioTapSource = "Direct Tap (\(count) frames)"
+            if model?.listening == true {
+              model?.stopListening()
+            }
+          } else if monitorTicks >= 4 && self.isPlaying && !self.userStoppedMicrophone {
+            if model?.listening != true {
+              self.audioTapSource = "Acoustic Tap (Microphone Fallback)"
+              await model?.start()
+            }
+          }
+#else
+          if monitorTicks >= 4 && self.isPlaying && !self.userStoppedMicrophone && model?.listening != true {
+            self.audioTapSource = "Acoustic Tap (Microphone Fallback)"
+            await model?.start()
+          }
+#endif
           if state == .stopped {
             self.appleMusicActive = false
             model?.stop(preserveMusic: false)
@@ -396,6 +443,7 @@ final class LocalMusicPlayer {
       isPlaying = true
       isPaused = false
       player.play()
+      audioTapSource = "Direct file audio analysis (zero mic)"
       model.status = "Playing • \(track.title)"
       message = "Direct audio analysis • microphone off"
     } catch {
@@ -417,6 +465,9 @@ final class LocalMusicPlayer {
       } else {
         Task { @MainActor in
           do {
+            let session = AVAudioSession.sharedInstance()
+            try? session.setCategory(.playback, mode: .default)
+            try? session.setActive(true)
             try await ApplicationMusicPlayer.shared.play()
             self.isPlaying = true
             self.isPaused = false
@@ -498,6 +549,10 @@ final class LocalMusicPlayer {
     musicMonitor = nil
     if appleMusicActive { ApplicationMusicPlayer.shared.stop() }
     appleMusicActive = false
+#if DEBUG
+    privateTap?.stop()
+    privateTap = nil
+#endif
     node?.stop()
     engine?.stop()
     if tapInstalled { tapMixer?.removeTap(onBus: 0) }
@@ -508,5 +563,6 @@ final class LocalMusicPlayer {
     delayNode = nil
     isPlaying = false
     isPaused = false
+    audioTapSource = "Direct file audio analysis (zero mic)"
   }
 }

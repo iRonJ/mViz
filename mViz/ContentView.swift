@@ -22,7 +22,7 @@ struct ContentView: View {
           model.listening ? "Stop microphone" : "Start microphone",
           systemImage: model.listening ? "mic.fill" : "mic"
         ) {
-          if model.listening { model.stop() } else { Task { await model.start() } }
+          if model.listening { model.stopListening() } else { Task { await model.start() } }
         }
         Text(model.status).font(.callout).foregroundStyle(.secondary)
         VisualizerControls(model: model)

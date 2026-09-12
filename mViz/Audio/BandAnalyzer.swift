@@ -7,17 +7,17 @@ public struct BandAnalyzer: Sendable {
     31.25, 62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0
   ]
 
-  // Biquad state for each of the 10 bands
-  private var x1 = [Float](repeating: 0, count: 10)
-  private var x2 = [Float](repeating: 0, count: 10)
-  private var y1 = [Float](repeating: 0, count: 10)
-  private var y2 = [Float](repeating: 0, count: 10)
+  // Biquad state for each of the 10 bands packed into SIMD16 (zero heap allocations)
+  private var x1 = SIMD16<Float>.zero
+  private var x2 = SIMD16<Float>.zero
+  private var y1 = SIMD16<Float>.zero
+  private var y2 = SIMD16<Float>.zero
 
-  // Cached coefficients
+  // Cached coefficients packed into SIMD16
   private var cachedSampleRate: Double = 0
-  private var b0 = [Float](repeating: 0, count: 10)
-  private var a1 = [Float](repeating: 0, count: 10)
-  private var a2 = [Float](repeating: 0, count: 10)
+  private var b0 = SIMD16<Float>.zero
+  private var a1 = SIMD16<Float>.zero
+  private var a2 = SIMD16<Float>.zero
 
   public init() {}
 
@@ -25,10 +25,10 @@ public struct BandAnalyzer: Sendable {
     guard sampleRate != cachedSampleRate else { return }
     cachedSampleRate = sampleRate
     let q: Float = 1.414 // 1 octave bandwidth
+    b0 = .zero; a1 = .zero; a2 = .zero
     for i in 0..<10 {
       let fc = Self.centerFrequencies[i]
       if Double(fc) >= sampleRate * 0.48 {
-        b0[i] = 0; a1[i] = 0; a2[i] = 0
         continue
       }
       let w0 = Float(2.0 * Double.pi * Double(fc) / sampleRate)
@@ -55,20 +55,20 @@ public struct BandAnalyzer: Sendable {
     guard count > 0, sampleRate > 0 else { return (.zero, .zero) }
     updateCoefficients(sampleRate: sampleRate)
 
-    var power = [Float](repeating: 0, count: 10)
+    var power = SIMD16<Float>.zero
 
     for s in 0..<count {
-      let x = samples[s].isFinite ? samples[s] : 0
-      for i in 0..<10 {
-        guard b0[i] != 0 else { continue }
-        // Biquad bandpass filter: y[n] = b0*(x[n] - x[n-2]) - a1*y[n-1] - a2*y[n-2]
-        let y = b0[i] * (x - x2[i]) - a1[i] * y1[i] - a2[i] * y2[i]
-        x2[i] = x1[i]
-        x1[i] = x
-        y2[i] = y1[i]
-        y1[i] = y
-        power[i] += y * y
-      }
+      let sample = samples[s]
+      let x = sample.isFinite ? sample : 0
+      let xVec = SIMD16<Float>(repeating: x)
+      // Vectorized biquad bandpass filter across all 10 bands simultaneously:
+      // y[n] = b0 * (x[n] - x[n-2]) - a1 * y[n-1] - a2 * y[n-2]
+      let y = b0 * (xVec - x2) - a1 * y1 - a2 * y2
+      x2 = x1
+      x1 = xVec
+      y2 = y1
+      y1 = y
+      power += y * y
     }
 
     let invCount = 1.0 / Float(count)

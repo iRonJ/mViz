@@ -5,8 +5,7 @@
 
   /// Read-only runtime inspection. Does not instantiate taps or capture any audio.
   enum AudioAPIDiagnostics {
-    static func runIfRequested() {
-      guard ProcessInfo.processInfo.arguments.contains("--inspect-audio-api") else { return }
+    static func run() {
       var lines = ["OS: \(ProcessInfo.processInfo.operatingSystemVersionString)"]
       for framework in ["MediaPlaybackCore", "AudioToolbox"] {
         let directory = framework == "MediaPlaybackCore" ? "PrivateFrameworks" : "Frameworks"
@@ -35,6 +34,23 @@
           }
         }
       }
+
+      // Test MVPrivateAudioTap initialization and activation
+      let tap = MVPrivateAudioTap()
+      var samplesReceived: UInt32 = 0
+      let started = tap.startDefault { samples, count in
+        samplesReceived += count
+      }
+      lines.append("\nMVPrivateAudioTap Test:")
+      lines.append("  Started: \(started)")
+      lines.append("  Diagnostic: \(tap.diagnostic)")
+      lines.append("  Sample Rate: \(tap.sampleRate)")
+      lines.append("  Channels: \(tap.numberOfChannels)")
+      lines.append("  Samples Received: \(samplesReceived)")
+      tap.stop()
+
+      lines.append("\n" + MVPrivateAudioTap.runDiagnosticProbe())
+
       let report = lines.joined(separator: "\n")
       let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
       do {

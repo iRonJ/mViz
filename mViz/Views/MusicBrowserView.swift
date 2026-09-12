@@ -60,10 +60,14 @@ struct MusicBrowserView: View {
             }
           }
         }
-        Text(
-          "Imported files drive particles directly. Apple Music uses its own player; enable microphone input for audio response."
-        )
-        .font(.caption).foregroundStyle(.secondary)
+        HStack(spacing: 6) {
+          Image(systemName: player.audioTapSource.contains("Microphone") ? "mic.fill" : "waveform")
+            .foregroundStyle(player.audioTapSource.contains("Direct") ? .cyan : .green)
+          Text("Audio Source: \(player.audioTapSource)")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
         if player.appleMusicActive {
           Button(player.isPlaying ? "Pause music" : "Resume music") {
             player.togglePause(model: model)

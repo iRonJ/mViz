@@ -64,7 +64,7 @@ public enum AppleMusicURLParser {
       if typeIndex + 1 < pathComponents.count {
         let rawSlug = pathComponents[typeIndex + 1]
         // If the next component is an ID (all digits or pl.*), it's not a title slug
-        if rawSlug.range(of: #"^\d+$"#, options: .regularExpression) == nil
+        if !rawSlug.allSatisfy(\.isNumber)
           && !rawSlug.lowercased().hasPrefix("pl.")
         {
           return cleanSlug(rawSlug)

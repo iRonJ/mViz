@@ -1,4 +1,15 @@
-import Foundation
+private let _orbit = NebulaMode()
+private let _helix = HelixMode()
+private let _aurora = AuroraMode()
+private let _vortex = VortexMode()
+private let _room = RoomBounceMode()
+private let _line = MirrorLineMode()
+private let _grid = MirrorPlaneMode()
+private let _rain = RainMode()
+private let _volcano = VolcanoMode()
+private let _fog = CosmicFogMode()
+private let _supernova = SupernovaMode()
+private let _flurry = FlurrySpectrumMode()
 
 enum MotionMode: String, CaseIterable, Identifiable {
   case orbit = "Nebula"
@@ -14,20 +25,38 @@ enum MotionMode: String, CaseIterable, Identifiable {
   case supernova = "Supernova"
   case flurry = "Flurry spectrum"
   var id: Self { self }
+
+  var index: Int {
+    switch self {
+    case .orbit: return 0
+    case .helix: return 1
+    case .aurora: return 2
+    case .vortex: return 3
+    case .room: return 4
+    case .line: return 5
+    case .grid: return 6
+    case .rain: return 7
+    case .volcano: return 8
+    case .fog: return 9
+    case .supernova: return 10
+    case .flurry: return 11
+    }
+  }
+
   var definition: any MotionPattern {
     switch self {
-    case .orbit: NebulaMode()
-    case .helix: HelixMode()
-    case .aurora: AuroraMode()
-    case .vortex: VortexMode()
-    case .room: RoomBounceMode()
-    case .line: MirrorLineMode()
-    case .grid: MirrorPlaneMode()
-    case .rain: RainMode()
-    case .volcano: VolcanoMode()
-    case .fog: CosmicFogMode()
-    case .supernova: SupernovaMode()
-    case .flurry: FlurrySpectrumMode()
+    case .orbit: return _orbit
+    case .helix: return _helix
+    case .aurora: return _aurora
+    case .vortex: return _vortex
+    case .room: return _room
+    case .line: return _line
+    case .grid: return _grid
+    case .rain: return _rain
+    case .volcano: return _volcano
+    case .fog: return _fog
+    case .supernova: return _supernova
+    case .flurry: return _flurry
     }
   }
 }

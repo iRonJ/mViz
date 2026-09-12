@@ -67,7 +67,7 @@ struct ImmersiveView: View {
               systemImage: model.listening ? "mic.fill" : "mic"
             ) {
               if model.listening {
-                model.stop()
+                model.stopListening()
               } else {
                 Task { await model.start() }
               }
@@ -96,7 +96,7 @@ struct ImmersiveView: View {
       updateSubscription = nil
       field?.stopRoom(model: model)
       model.isImmersed = false
-      model.stop()
+      model.stop(preserveMusic: true)
     }
   }
 }

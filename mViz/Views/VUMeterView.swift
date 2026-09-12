@@ -68,6 +68,13 @@ struct VUMeterView: View {
         .background(.ultraThinMaterial, in: Capsule())
       }
 
+      if model.library.appleMusicActive || model.library.isPlaying || model.listening {
+        Text(model.listening ? "Input: Microphone" : model.library.audioTapSource)
+          .font(.system(size: 9, weight: .medium))
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
+
       // 10-Band Spectrum Equalizer Bars
       HStack(alignment: .bottom, spacing: 6) {
         ForEach(0..<10, id: \.self) { band in

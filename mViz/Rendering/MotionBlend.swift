@@ -4,30 +4,41 @@ import Foundation
 /// Both automatic and manual changes use the same continuous blend.
 struct MotionBlend {
   private(set) var weights: [Float] = MotionMode.allCases.map { $0 == .orbit ? 1 : 0 }
-  subscript(_ mode: MotionMode) -> Float { weights[MotionMode.allCases.firstIndex(of: mode)!] }
+  subscript(_ mode: MotionMode) -> Float { weights[mode.index] }
 
   private var orbitAngle: Float = 0
   private var motionTime: Float = 0
 
   mutating func advance(toward mode: MotionMode, dt: Float, speed: Float = 1) {
     let amount = 1 - exp(-max(0, dt) * 0.8)
+    let targetIndex = mode.index
     for index in weights.indices {
-      let target: Float = MotionMode.allCases[index] == mode ? 1 : 0
+      let target: Float = index == targetIndex ? 1 : 0
       weights[index] += (target - weights[index]) * amount
     }
     let motionStep = MotionRate(speed).advance(max(0, dt))
     motionTime += motionStep
-    let velocity = zip(MotionMode.allCases, weights).reduce(Float(0)) { result, entry in
-      result + entry.0.definition.angularVelocity(time: motionTime) * entry.1
+    var velocity: Float = 0
+    let allModes = MotionMode.allCases
+    for index in weights.indices {
+      let w = weights[index]
+      if w > 0.001 {
+        velocity += allModes[index].definition.angularVelocity(time: motionTime) * w
+      }
     }
     orbitAngle += velocity * motionStep
   }
 
   func position(phase: Float, time: Float, bass: Float) -> SIMD3<Float> {
     // x = radius, y = height, z = angular offset relative to the shared orbit.
-    let poses = MotionMode.allCases.map { $0.definition.pose(phase: phase, time: time) }
     var pose = SIMD3<Float>.zero
-    for index in weights.indices { pose += poses[index] * weights[index] }
+    let allModes = MotionMode.allCases
+    for index in weights.indices {
+      let w = weights[index]
+      if w > 0.001 {
+        pose += allModes[index].definition.pose(phase: phase, time: time) * w
+      }
+    }
     let angle = phase + orbitAngle + pose.z
     let rawRadius = max(0, pose.x + bass * 0.3 * min(1, pose.x))
     // Maintain a safe viewing sphere around the user at eye level (1.5m),

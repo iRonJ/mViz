@@ -105,6 +105,9 @@ final class ParticleField {
     }
   }
 
+  private static let evolvingForms: [EmitterForm] = [.sphere, .torus, .plane, .cone, .box]
+  private static let evolvingStyles: [ParticleStyle] = [.glow, .sparks, .rings, .flakes]
+
   func update(dt: Float, model: VisualizerModel) {
     let dt = min(max(dt, 0), 0.1)
     let motionRate = MotionRate(model.motionSpeed)
@@ -136,9 +139,8 @@ final class ParticleField {
     }
     blend.advance(toward: activeMode, dt: dt, speed: model.motionSpeed)
 
-    let forms: [EmitterForm] = [.sphere, .torus, .plane, .cone, .box]
     let desiredForm =
-      model.shape == .evolving ? forms[Int(shapeTime / 8) % forms.count] : model.shape
+      model.shape == .evolving ? Self.evolvingForms[Int(shapeTime / 8) % Self.evolvingForms.count] : model.shape
     // Collapse the emission surface, change topology, then expand. Existing
     // particles keep their world-space trails throughout the transition.
     if desiredForm != currentForm {
@@ -185,6 +187,7 @@ final class ParticleField {
       var sWeight: Float = 0
       for mode in MotionMode.allCases {
         let w = blend[mode]
+        guard w > 0.001 else { continue }
         switch mode.definition.lightingStyle {
         case .off: break
         case .pulse: pWeight += w
@@ -220,10 +223,9 @@ final class ParticleField {
       backgroundGlow.components.set(OpacityComponent(opacity: 0))
       lastGlowOpacity = 0
     }
-    let styles: [ParticleStyle] = [.glow, .sparks, .rings, .flakes]
     let style =
       model.particleStyle == .evolving
-      ? styles[Int(shapeTime / 12) % styles.count] : model.particleStyle
+      ? Self.evolvingStyles[Int(shapeTime / 12) % Self.evolvingStyles.count] : model.particleStyle
     flurry.update(
       levels: geq10Envelope, time: time, weight: blend[.flurry],
       intensity: model.intensity, speed: model.motionSpeed, reduceMotion: model.reduceMotion)
@@ -262,8 +264,9 @@ final class ParticleField {
     var blendedSpreadBoost: Float = 0
     var blendedBirthMultiplier: Float = 1
     for mode in MotionMode.allCases {
-      let dynamics = mode.definition.dynamics(bass: envelope.x)
       let weight = blend[mode]
+      guard weight > 0.001 else { continue }
+      let dynamics = mode.definition.dynamics(bass: envelope.x)
       if let target = dynamics.direction {
         blendedDirection += target * weight
         blendedDirectionWeight += weight

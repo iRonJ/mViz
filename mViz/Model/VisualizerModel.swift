@@ -149,7 +149,7 @@ final class VisualizerModel {
           userInfo: [NSLocalizedDescriptionKey: "No microphone input is available."])
       }
       var analyzer = BandAnalyzer()
-      input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+      input.installTap(onBus: 0, bufferSize: 512, format: format) { [weak self] buffer, _ in
         guard let samples = buffer.floatChannelData?[0] else { return }
         let (macro, geq10) = analyzer.processDetailed(
           samples, count: Int(buffer.frameLength), sampleRate: buffer.format.sampleRate)

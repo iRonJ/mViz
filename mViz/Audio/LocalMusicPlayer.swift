@@ -510,7 +510,7 @@ final class LocalMusicPlayer {
 
       let format = stereoFormat
       var analyzers = Array(repeating: BandAnalyzer(), count: 2)
-      tapMix.installTap(onBus: 0, bufferSize: 1024, format: format) {
+      tapMix.installTap(onBus: 0, bufferSize: 512, format: format) {
         [weak model] buffer, _ in
         guard let channels = buffer.floatChannelData else { return }
         // Analyze every output channel so hard-panned music still drives visuals.

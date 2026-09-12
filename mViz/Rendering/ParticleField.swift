@@ -159,14 +159,14 @@ final class ParticleField {
       AudioLevelCurve.map(raw.z, logarithmic: model.logarithmicLevels))
     // Keep onset detection independent of visual compression and A/B changes.
     let linearBass = AudioLevelCurve.map(raw.x, logarithmic: false)
-    let bassRate: Float = linearBass > linearBassEnvelope ? 28 : 6
+    let bassRate: Float = linearBass > linearBassEnvelope ? 55 : 12
     linearBassEnvelope += (linearBass - linearBassEnvelope) * (1 - exp(-dt * bassRate))
     // Tuned attack and decay rates per frequency register:
-    // Bass: punchy attack 28, solid decay 6
-    // Mid: agile attack 32, flowing decay 10
-    // Treble: razor-sharp attack 45, transient decay 16
-    let attackRates: SIMD3<Float> = [28, 32, 45]
-    let decayRates: SIMD3<Float> = [6, 10, 16]
+    // Bass: punchy attack 50, solid decay 12
+    // Mid: agile attack 55, flowing decay 16
+    // Treble: razor-sharp attack 70, transient decay 24
+    let attackRates: SIMD3<Float> = [50, 55, 70]
+    let decayRates: SIMD3<Float> = [12, 16, 24]
     for i in 0..<3 {
       let rate: Float = signal[i] > envelope[i] ? attackRates[i] : decayRates[i]
       envelope[i] += (signal[i] - envelope[i]) * (1 - exp(-dt * rate))
@@ -176,8 +176,8 @@ final class ParticleField {
     let raw10 = model.bands10 * model.sensitivity * 8
     for i in 0..<10 {
       let sig = AudioLevelCurve.map(raw10[i], logarithmic: model.logarithmicLevels)
-      let attack: Float = i < 3 ? 28 : (i < 7 ? 32 : 45)
-      let decay: Float = i < 3 ? 6 : (i < 7 ? 10 : 16)
+      let attack: Float = i < 3 ? 50 : (i < 7 ? 55 : 70)
+      let decay: Float = i < 3 ? 12 : (i < 7 ? 16 : 24)
       let rate: Float = sig > geq10Envelope[i] ? attack : decay
       geq10Envelope[i] += (sig - geq10Envelope[i]) * (1 - exp(-dt * rate))
     }
@@ -301,6 +301,9 @@ final class ParticleField {
     let bassPunch = pow(envelope.x, 1.25)
     let midDensity = pow(envelope.y, 1.2)
     let midSpeed = pow(envelope.y, 1.1)
+    let totalEnergy = max(linearBassEnvelope, max(envelope.x, max(envelope.y, envelope.z)))
+    let activity = min(1.0, max(0.0, (totalEnergy - 0.008) / 0.10))
+    let beatPulseIntensity = beatPulse.beatIntensity
     for index in 0..<12 {
       let entity = emitters[index]
       let stage = stageEmitters[index]
@@ -323,9 +326,10 @@ final class ParticleField {
       let bandEnergy: Float =
         index < 10 ? geq10Envelope[index] : (index == 10 ? envelope.x : envelope.z)
 
-      // 2. Mid-range frequencies track particle emission rate & density
+      // 2. Mid-range frequencies track particle emission rate & density (whisper floor in silence)
+      let baseFloor = 2.0 + activity * 18.0
       var baseBirthRate =
-        (20 + midDensity * 360 + midBandBoost * 140 + bandEnergy * 50) * model.intensity
+        (baseFloor + midDensity * 360 + midBandBoost * 140 + bandEnergy * 50) * model.intensity
         * (1 - blend[.room] * (surfacesAvailable ? 0.85 : 0))
       if index >= 3 && index <= 6 {
         baseBirthRate *= 1.25  // Melodic mid-frequency emitters carry extra lush density
@@ -333,9 +337,12 @@ final class ParticleField {
 
       particles.mainEmitter.lifeSpan = Double(2.5 + aurora * 0.8)
 
-      // Particle size expands with punchy bass hits
+      // Particle size expands with punchy bass hits and pulses directly on the beat!
+      // In silence/quiet: drops to 0.002m (tiny specks). Active: scales up to 0.050m+ on kicks.
+      let baseParticleSize: Float = 0.002 + activity * 0.006
       var dynamicSize: Float =
-        (0.010 + bassPunch * 0.034 + lowBandBoost * 0.018) * activeDynamics.sizeScale
+        (baseParticleSize + bassPunch * 0.034 + beatPulseIntensity * 0.018 + lowBandBoost * 0.016)
+        * activeDynamics.sizeScale
       if index < 3 {
         dynamicSize *= 1.35  // Bass/sub-bass emitters form heavier celestial bodies
       }
@@ -355,14 +362,15 @@ final class ParticleField {
       let rawDirLen = length(rawDir)
       particles.emissionDirection = rawDirLen > 0.001 ? rawDir / rawDirLen : [0, 1, 0]
 
-      // 3. High-frequency color sizzle & beat-driven palette rotation with brightness pulse
+      // 3. High-frequency color sizzle & beat-driven palette rotation with brightness pulse and silence dimming
       let baseEmitterHue = Float(index) / 12.0 + aurora * 0.15
       let (emitterStartColor, emitterEndColor) = reactiveEmitterColors(
         baseHue: baseEmitterHue,
         bands: envelope,
         highFrequency: max(envelope.z, highBandBoost),
         hueOffset: beatPulse.paletteHue,
-        beatPulse: beatPulse.beatIntensity
+        beatPulse: beatPulseIntensity,
+        activity: activity
       )
       particles.mainEmitter.color = .evolving(
         start: .single(emitterStartColor), end: .single(emitterEndColor))
@@ -405,7 +413,7 @@ final class ParticleField {
         let magmaHue = CGFloat(
           (0.02 + envelope.x * 0.10 + trebleSizzle * 0.05 + beatPulse.paletteHue * 0.15)
             .truncatingRemainder(dividingBy: 1.0))
-        let magmaBrightness = CGFloat(min(1.0, 0.65 + beatPulse.beatIntensity * 0.35))
+        let magmaBrightness = CGFloat(min(1.0, 0.18 + activity * 0.47 + beatPulseIntensity * 0.35))
         let magmaStart = UIColor(
           hue: magmaHue >= 0 ? magmaHue : magmaHue + 1.0,
           saturation: CGFloat(max(0.2, 0.85 - trebleSizzle * 0.55)),
@@ -423,7 +431,7 @@ final class ParticleField {
       particles.mainEmitter.angularSpeed *= motionRate.multiplier
       particles.mainEmitter.lifeSpan /= Double(sqrt(motionRate.multiplier))
       particles.mainEmitter.size *= model.particleSize
-      particles.mainEmitter.sizeVariation = 0.012 * model.particleSize
+      particles.mainEmitter.sizeVariation = (0.001 + activity * 0.011) * model.particleSize
       let birthRate = ParticleBudget.birthRate(
         requested: particles.mainEmitter.birthRate, lifeSpan: particles.mainEmitter.lifeSpan)
 
@@ -452,7 +460,8 @@ final class ParticleField {
           bands: envelope,
           highFrequency: max(envelope.z, highBandBoost),
           hueOffset: beatPulse.paletteHue,
-          beatPulse: beatPulse.beatIntensity
+          beatPulse: beatPulseIntensity,
+          activity: activity
         )
         particles.mainEmitter.color = .evolving(
           start: .single(stageStart),

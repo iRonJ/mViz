@@ -12,16 +12,19 @@ enum BeatLightingStyle: String, CaseIterable, Identifiable {
 struct BeatPulse {
   private var previous: Float = 0
   private var baseline: Float = 0
-  private var cooldown: Float = 1
+  private var beatCooldown: Float = 1
+  private var strobeCooldown: Float = 1
   private var age: Float = 10
+  private var strobeAge: Float = 10
   private var strength: Float = 0
+  private var strobeStrength: Float = 0
   private(set) var beatTriggered: Bool = false
   private(set) var paletteHue: Float = 0
   private var targetPaletteHue: Float = 0
 
   /// Current normalized beat envelope (peaks on onset, decaying smoothly over ~0.35s).
   var beatIntensity: Float {
-    strength * exp(-age * 5)
+    strength * exp(-age * 6.5)
   }
 
   mutating func update(bass: Float, dt: Float, style: BeatLightingStyle) -> Float {
@@ -39,19 +42,28 @@ struct BeatPulse {
 
   mutating func update(bass: Float, dt: Float, pulseWeight: Float, strobeWeight: Float) -> Float {
     let dt = max(0, dt)
-    cooldown += dt
+    beatCooldown += dt
+    strobeCooldown += dt
     age += dt
+    strobeAge += dt
     baseline += (bass - baseline) * (1 - exp(-dt * 1.5))
     beatTriggered = false
 
-    // Beat onset detection (independent of lighting style, capped at 2 Hz for photosafety)
-    if cooldown >= 0.5 && bass > 0.08 && bass - previous > 0.9 * dt
-      && bass > baseline * 1.10
+    // Musical beat onset detection (supports tempos up to 250 BPM, cooldown >= 0.24s)
+    if beatCooldown >= 0.24 && bass > 0.06 && bass - previous > 0.6 * dt
+      && bass > baseline * 1.08
     {
       age = 0
-      cooldown = 0
+      beatCooldown = 0
       strength = min(1, bass * 1.5)
       beatTriggered = true
+
+      // Strobe flash rate cap strictly preserved at <= 2 Hz (cooldown >= 0.49s) for photosafety
+      if strobeCooldown >= 0.49 {
+        strobeCooldown = 0
+        strobeAge = 0
+        strobeStrength = strength
+      }
 
       // Advance palette target by golden ratio fraction (~0.618034)
       // which rotates to aesthetically pleasing, highly distinct harmonic hues.
@@ -74,7 +86,7 @@ struct BeatPulse {
       return 0
     }
     let pulseVal = strength * exp(-age * 5)
-    let strobeVal = age < 0.07 ? strength : 0
+    let strobeVal = strobeAge < 0.07 ? strobeStrength : 0
     return pulseWeight * pulseVal + strobeWeight * strobeVal
   }
 }

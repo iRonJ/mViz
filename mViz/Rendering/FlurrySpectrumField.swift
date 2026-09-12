@@ -74,31 +74,33 @@ final class FlurrySpectrumField {
       particles.speed = (reduceMotion ? 0.12 : 0.25 + pow(level, 1.1) * 0.45) * rate
 
       // Frequency-specific wisp dynamics:
+      let wispActivity = min(1.0, max(0.0, (level - 0.01) / 0.08))
       if band < 3 {
         // Low bands: bass pumps particle size
-        particles.mainEmitter.size = 0.022 + pow(level, 1.25) * 0.035
+        particles.mainEmitter.size = 0.003 + wispActivity * 0.019 + pow(level, 1.25) * 0.035
         particles.mainEmitter.birthRate =
-          (12 + pow(level, 1.1) * 110) * max(0, min(1, intensity)) * weight
+          (wispActivity * 12 + pow(level, 1.1) * 110) * max(0, min(1, intensity)) * weight
         particles.mainEmitter.noiseStrength = reduceMotion ? 0.02 : 0.15
         particles.mainEmitter.noiseAnimationSpeed = rate * 0.35
       } else if band < 7 {
         // Mid bands: melodic energy surges birth rate
-        particles.mainEmitter.size = 0.020 + level * 0.015
+        particles.mainEmitter.size = 0.003 + wispActivity * 0.017 + level * 0.015
         particles.mainEmitter.birthRate =
-          (15 + pow(level, 1.2) * 180) * max(0, min(1, intensity)) * weight
+          (wispActivity * 15 + pow(level, 1.2) * 180) * max(0, min(1, intensity)) * weight
         particles.mainEmitter.noiseStrength = reduceMotion ? 0.02 : 0.22
         particles.mainEmitter.noiseAnimationSpeed = rate * 0.4
       } else {
         // High bands: high-frequency sizzle and sparkle
         let sizzle = pow(level, 1.2)
-        particles.mainEmitter.size = 0.015 + sizzle * 0.012
-        particles.mainEmitter.birthRate = (8 + sizzle * 120) * max(0, min(1, intensity)) * weight
+        particles.mainEmitter.size = 0.003 + wispActivity * 0.012 + sizzle * 0.012
+        particles.mainEmitter.birthRate =
+          (wispActivity * 8 + sizzle * 120) * max(0, min(1, intensity)) * weight
         particles.mainEmitter.noiseStrength = reduceMotion ? 0.02 : 0.25 + sizzle * 0.35
         particles.mainEmitter.noiseAnimationSpeed = rate * (0.4 + sizzle * 3.0)
       }
 
       particles.mainEmitter.size *= particleSize
-      particles.mainEmitter.sizeVariation = 0.012 * particleSize
+      particles.mainEmitter.sizeVariation = (0.001 + wispActivity * 0.011) * particleSize
       particles.mainEmitter.lifeSpan = 3.2 / Double(sqrt(rate))
       wisp.components.set(particles)
     }

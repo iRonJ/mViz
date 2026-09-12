@@ -1,21 +1,25 @@
-//
-//  mVizApp.swift
-//  mViz
-//
-//  Created by Ron Jailall on 3/8/24.
-//
-
+import AVFoundation
+import Observation
 import SwiftUI
 
 @main
 struct mVizApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }.windowStyle(.volumetric)
+  @State private var model = VisualizerModel()
 
-        ImmersiveSpace(id: "ImmersiveSpace") {
-            ImmersiveView()
+  var body: some Scene {
+    WindowGroup {
+      ContentView(model: model)
+        .task {
+          #if DEBUG
+            AudioAPIDiagnostics.runIfRequested()
+          #endif
         }
     }
+    .defaultSize(width: 560, height: 740)
+
+    ImmersiveSpace(id: "ImmersiveSpace") {
+      ImmersiveView(model: model)
+    }
+    .immersionStyle(selection: $model.immersionStyle, in: .mixed, .full)
+  }
 }

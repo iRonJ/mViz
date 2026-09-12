@@ -6,11 +6,6 @@ import SwiftUI
 struct mVizApp: App {
   @State private var model = VisualizerModel()
 
-  init() {
-    #if DEBUG
-      AudioAPIDiagnostics.run()
-    #endif
-  }
 
   var body: some Scene {
     WindowGroup {

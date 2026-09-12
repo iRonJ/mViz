@@ -75,12 +75,6 @@
     if ([_tap respondsToSelector:@selector(setNumberOfFrames:)]) {
       [_tap setNumberOfFrames:1024];
     }
-    if ([_tap respondsToSelector:@selector(_createProcessTapWithNumberOfFrames:sampleRate:)]) {
-      typedef void (*CreateTapFn)(id, SEL, unsigned int, double);
-      CreateTapFn fn = (CreateTapFn)[_tap methodForSelector:@selector(_createProcessTapWithNumberOfFrames:sampleRate:)];
-      fn(_tap, @selector(_createProcessTapWithNumberOfFrames:sampleRate:), 1024, 48000.0);
-    }
-
     if ([_tap respondsToSelector:@selector(setEnabled:)]) {
       [_tap setEnabled:YES];
     }
@@ -111,26 +105,27 @@
   }
 }
 
-// Intercept any variant of delegate messages
-- (BOOL)respondsToSelector:(SEL)aSelector {
-  NSString *selStr = NSStringFromSelector(aSelector);
-  if ([selStr containsString:@"Tap"] || [selStr containsString:@"Audio"] || [selStr containsString:@"Sample"]) {
-    NSLog(@"[MVPrivateAudioTap query] respondsToSelector: %@", selStr);
-    return YES;
+- (void)processAudioTapDidReceiveAudioSamples:(void *)samples numberOfSamples:(unsigned int)count sampleRate:(double)rate {
+  _samplesReceivedCount += count;
+  if (rate > 0) {
+    _sampleRate = (uint32_t)rate;
   }
-  return [super respondsToSelector:aSelector];
+  if (samples && count && _handler) {
+    _handler((const float *)samples, count);
+  }
 }
 
-- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector {
-  NSMethodSignature *sig = [super methodSignatureForSelector:aSelector];
-  if (!sig) {
-    sig = [NSMethodSignature signatureWithObjCTypes:"v@:@@@@@@@@"];
+- (void)processAudioTapDidReceiveAudioSamples:(void *)samples numberOfSamples:(unsigned int)count sampleRate:(double)rate numberOfChannels:(unsigned int)channels {
+  _samplesReceivedCount += count;
+  if (rate > 0) {
+    _sampleRate = (uint32_t)rate;
   }
-  return sig;
-}
-
-- (void)forwardInvocation:(NSInvocation *)anInvocation {
-  NSLog(@"[MVPrivateAudioTap intercepted invocation]: %@", NSStringFromSelector(anInvocation.selector));
+  if (channels > 0) {
+    _numberOfChannels = channels;
+  }
+  if (samples && count && _handler) {
+    _handler((const float *)samples, count);
+  }
 }
 
 - (NSString *)tapIvarsSummary {
@@ -174,110 +169,9 @@
   Class tapCls = NSClassFromString(@"MPCProcessAudioTap");
   [out appendFormat:@"MPCProcessAudioTap available: %@\n", tapCls ? @"YES" : @"NO"];
 
-  // Probe 1: initWithRefreshRate:nil delegate:
-  if (tapCls && [tapCls instancesRespondToSelector:@selector(initWithRefreshRate:delegate:)]) {
-    @try {
-      MVPrivateAudioTap *probe = [[MVPrivateAudioTap alloc] init];
-      id rawTap = [[tapCls alloc] initWithRefreshRate:nil delegate:probe];
-      [out appendFormat:@"Probe 1 (initWithRefreshRate:): %@\n", rawTap ? @"Allocated" : @"nil"];
-      if (rawTap) {
-        probe->_tap = rawTap;
-        if ([rawTap respondsToSelector:@selector(setNumberOfFrames:)]) [rawTap setNumberOfFrames:1024];
-        if ([rawTap respondsToSelector:@selector(_createProcessTapWithNumberOfFrames:sampleRate:)]) {
-          typedef void (*CreateTapFn)(id, SEL, unsigned int, double);
-          CreateTapFn fn = (CreateTapFn)[rawTap methodForSelector:@selector(_createProcessTapWithNumberOfFrames:sampleRate:)];
-          fn(rawTap, @selector(_createProcessTapWithNumberOfFrames:sampleRate:), 1024, 48000.0);
-          [out appendString:@"  Called _createProcessTapWithNumberOfFrames:1024 sampleRate:48000.0\n"];
-        }
-        [out appendString:[probe tapIvarsSummary]];
-        if ([rawTap respondsToSelector:@selector(setEnabled:)]) [rawTap setEnabled:YES];
-        [rawTap start];
-        [out appendFormat:@"  Start succeeded. isEnabled: %d\n", [rawTap respondsToSelector:@selector(isEnabled)] ? [rawTap isEnabled] : -1];
-        [rawTap stop];
-      }
-    } @catch (NSException *e) {
-      [out appendFormat:@"Probe 1 exception: %@\n", e.reason];
-    }
-  }
-
-  // Probe 2: initWithPID:0
-  if (tapCls && [tapCls instancesRespondToSelector:@selector(initWithPID:refreshRate:delegate:)]) {
-    @try {
-      MVPrivateAudioTap *probe = [[MVPrivateAudioTap alloc] init];
-      id rawTap = [[tapCls alloc] initWithPID:0 refreshRate:nil delegate:probe];
-      [out appendFormat:@"Probe 2 (initWithPID:0): %@\n", rawTap ? @"Allocated" : @"nil"];
-      if (rawTap) {
-        probe->_tap = rawTap;
-        if ([rawTap respondsToSelector:@selector(setNumberOfFrames:)]) [rawTap setNumberOfFrames:1024];
-        if ([rawTap respondsToSelector:@selector(_createProcessTapWithNumberOfFrames:sampleRate:)]) {
-          typedef void (*CreateTapFn)(id, SEL, unsigned int, double);
-          CreateTapFn fn = (CreateTapFn)[rawTap methodForSelector:@selector(_createProcessTapWithNumberOfFrames:sampleRate:)];
-          fn(rawTap, @selector(_createProcessTapWithNumberOfFrames:sampleRate:), 1024, 48000.0);
-        }
-        [out appendString:[probe tapIvarsSummary]];
-        if ([rawTap respondsToSelector:@selector(setEnabled:)]) [rawTap setEnabled:YES];
-        [rawTap start];
-        [out appendFormat:@"  Start succeeded. isEnabled: %d\n", [rawTap respondsToSelector:@selector(isEnabled)] ? [rawTap isEnabled] : -1];
-        [rawTap stop];
-      }
-    } @catch (NSException *e) {
-      [out appendFormat:@"Probe 2 exception: %@\n", e.reason];
-    }
-  }
-
-  // Probe 3: initWithPID:getpid()
-  if (tapCls && [tapCls instancesRespondToSelector:@selector(initWithPID:refreshRate:delegate:)]) {
-    @try {
-      MVPrivateAudioTap *probe = [[MVPrivateAudioTap alloc] init];
-      id rawTap = [[tapCls alloc] initWithPID:getpid() refreshRate:nil delegate:probe];
-      [out appendFormat:@"Probe 3 (initWithPID:getpid()=%d): %@\n", getpid(), rawTap ? @"Allocated" : @"nil"];
-      if (rawTap) {
-        probe->_tap = rawTap;
-        if ([rawTap respondsToSelector:@selector(setNumberOfFrames:)]) [rawTap setNumberOfFrames:1024];
-        if ([rawTap respondsToSelector:@selector(_createProcessTapWithNumberOfFrames:sampleRate:)]) {
-          typedef void (*CreateTapFn)(id, SEL, unsigned int, double);
-          CreateTapFn fn = (CreateTapFn)[rawTap methodForSelector:@selector(_createProcessTapWithNumberOfFrames:sampleRate:)];
-          fn(rawTap, @selector(_createProcessTapWithNumberOfFrames:sampleRate:), 1024, 48000.0);
-        }
-        [out appendString:[probe tapIvarsSummary]];
-        if ([rawTap respondsToSelector:@selector(setEnabled:)]) [rawTap setEnabled:YES];
-        [rawTap start];
-        [out appendFormat:@"  Start succeeded. isEnabled: %d\n", [rawTap respondsToSelector:@selector(isEnabled)] ? [rawTap isEnabled] : -1];
-        [rawTap stop];
-      }
-    } @catch (NSException *e) {
-      [out appendFormat:@"Probe 3 exception: %@\n", e.reason];
-    }
-  }
-
-  // Probe 4: ATAudioTapDescription & ATAudioTap
   Class descCls = NSClassFromString(@"ATAudioTapDescription");
   Class ataTapCls = NSClassFromString(@"ATAudioTap");
   [out appendFormat:@"ATAudioTapDescription: %@, ATAudioTap: %@\n", descCls ? @"YES" : @"NO", ataTapCls ? @"YES" : @"NO"];
-  if (descCls && ataTapCls) {
-    @try {
-      if ([descCls instancesRespondToSelector:@selector(initSystemTapWithFormat:)]) {
-        id desc = [[descCls alloc] performSelector:@selector(initSystemTapWithFormat:) withObject:nil];
-        [out appendFormat:@"Probe 4a (initSystemTapWithFormat:nil): %@\n", desc ? @"Allocated" : @"nil"];
-        if (desc && [ataTapCls instancesRespondToSelector:@selector(initWithTapDescription:)]) {
-          id tapObj = [[ataTapCls alloc] performSelector:@selector(initWithTapDescription:) withObject:desc];
-          [out appendFormat:@"  ATAudioTap initWithTapDescription: %@\n", tapObj ? @"Success" : @"nil"];
-        }
-      }
-      if ([descCls instancesRespondToSelector:@selector(initProcessTapWithFormat:PID:)]) {
-        typedef id (*InitPIDFn)(id, SEL, id, int);
-        InitPIDFn fn = (InitPIDFn)[descCls instanceMethodForSelector:@selector(initProcessTapWithFormat:PID:)];
-        id desc = fn([descCls alloc], @selector(initProcessTapWithFormat:PID:), nil, getpid());
-        [out appendFormat:@"Probe 4b (initProcessTapWithFormat:PID:%d): %@\n", getpid(), desc ? @"Allocated" : @"nil"];
-        if (desc && [ataTapCls instancesRespondToSelector:@selector(initWithTapDescription:)]) {
-          id tapObj = [[ataTapCls alloc] performSelector:@selector(initWithTapDescription:) withObject:desc];
-          [out appendFormat:@"  ATAudioTap initWithTapDescription: %@\n", tapObj ? @"Success" : @"nil"];
-        }
-      }
-    } @catch (NSException *e) {
-      [out appendFormat:@"Probe 4 exception: %@\n", e.reason];
-    }
-  }
 
   return out;
 }

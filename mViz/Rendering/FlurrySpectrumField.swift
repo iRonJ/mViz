@@ -71,11 +71,31 @@ final class FlurrySpectrumField {
         SIMD3<Float>(
           reduceMotion ? 0 : 0.65 * sin(time * 0.55 + phase), 1,
           reduceMotion ? 0 : 0.22 * cos(time * 0.4 + phase)))
-      particles.speed = (reduceMotion ? 0.12 : 0.28 + level * 0.2) * rate
-      particles.mainEmitter.birthRate = (12 + 110 * level) * max(0, min(1, intensity)) * weight
+      particles.speed = (reduceMotion ? 0.12 : 0.25 + pow(level, 1.1) * 0.45) * rate
+
+      // Frequency-specific wisp dynamics:
+      if band < 3 {
+        // Low bands: bass pumps particle size
+        particles.mainEmitter.size = 0.022 + pow(level, 1.25) * 0.035
+        particles.mainEmitter.birthRate = (12 + pow(level, 1.1) * 110) * max(0, min(1, intensity)) * weight
+        particles.mainEmitter.noiseStrength = reduceMotion ? 0.02 : 0.15
+        particles.mainEmitter.noiseAnimationSpeed = rate * 0.35
+      } else if band < 7 {
+        // Mid bands: melodic energy surges birth rate
+        particles.mainEmitter.size = 0.020 + level * 0.015
+        particles.mainEmitter.birthRate = (15 + pow(level, 1.2) * 180) * max(0, min(1, intensity)) * weight
+        particles.mainEmitter.noiseStrength = reduceMotion ? 0.02 : 0.22
+        particles.mainEmitter.noiseAnimationSpeed = rate * 0.4
+      } else {
+        // High bands: high-frequency sizzle and sparkle
+        let sizzle = pow(level, 1.2)
+        particles.mainEmitter.size = 0.015 + sizzle * 0.012
+        particles.mainEmitter.birthRate = (8 + sizzle * 120) * max(0, min(1, intensity)) * weight
+        particles.mainEmitter.noiseStrength = reduceMotion ? 0.02 : 0.25 + sizzle * 0.35
+        particles.mainEmitter.noiseAnimationSpeed = rate * (0.4 + sizzle * 3.0)
+      }
+
       particles.mainEmitter.lifeSpan = 3.2 / Double(sqrt(rate))
-      particles.mainEmitter.noiseStrength = reduceMotion ? 0.02 : 0.22
-      particles.mainEmitter.noiseAnimationSpeed = rate * 0.35
       wisp.components.set(particles)
     }
   }

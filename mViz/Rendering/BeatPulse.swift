@@ -15,6 +15,9 @@ struct BeatPulse {
   private var cooldown: Float = 1
   private var age: Float = 10
   private var strength: Float = 0
+  private(set) var beatTriggered: Bool = false
+  private(set) var paletteHue: Float = 0
+  private var targetPaletteHue: Float = 0
 
   mutating func update(bass: Float, dt: Float, style: BeatLightingStyle) -> Float {
     switch style {
@@ -34,15 +37,33 @@ struct BeatPulse {
     cooldown += dt
     age += dt
     baseline += (bass - baseline) * (1 - exp(-dt * 1.5))
-    let active = pulseWeight > 0.001 || strobeWeight > 0.001
-    if active && cooldown >= 0.5 && bass > 0.08 && bass - previous > 0.015
+    beatTriggered = false
+
+    // Beat onset detection (independent of lighting style, capped at 2 Hz for photosafety)
+    if cooldown >= 0.5 && bass > 0.08 && bass - previous > 0.015
       && bass > baseline * 1.10
     {
       age = 0
       cooldown = 0
       strength = min(1, bass * 1.5)
+      beatTriggered = true
+
+      // Advance palette target by golden ratio fraction (~0.618034)
+      // which rotates to aesthetically pleasing, highly distinct harmonic hues.
+      targetPaletteHue += 0.618034
     }
     previous = bass
+
+    // Continuous smooth interpolation towards target hue, plus a subtle ambient drift
+    targetPaletteHue += dt * 0.015
+    let smoothing = 1 - exp(-dt * 5.0)
+    paletteHue += (targetPaletteHue - paletteHue) * smoothing
+    if paletteHue >= 100.0 {
+      paletteHue = paletteHue.truncatingRemainder(dividingBy: 1.0)
+      targetPaletteHue = targetPaletteHue.truncatingRemainder(dividingBy: 1.0)
+    }
+
+    let active = pulseWeight > 0.001 || strobeWeight > 0.001
     guard active else {
       strength = 0
       return 0

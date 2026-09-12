@@ -241,12 +241,13 @@ final class LocalMusicPlayer {
 #if DEBUG
       let tap = MVPrivateAudioTap()
       var tapAnalyzer = BandAnalyzer()
-      let tapStarted = tap.startDefault { [weak model] samples, count in
-        guard let model, count > 0 else { return }
+      let tapHandler: @convention(block) (UnsafePointer<Float>?, UInt32) -> Void = { [weak model] samples, count in
+        guard let model, let samples, count > 0 else { return }
         let (macro, geq10) = tapAnalyzer.processDetailed(samples, count: Int(count), sampleRate: 48000)
         model.bandStorage.bands = macro
         model.bandStorage.bands10 = geq10
       }
+      let tapStarted = tap.startDefault(handler: tapHandler)
       if tapStarted {
         tap.onFirstSampleReceived = { [weak self, weak model] in
           guard let self, let model else { return }
@@ -256,7 +257,8 @@ final class LocalMusicPlayer {
           }
         }
         self.privateTap = tap
-        self.audioTapSource = "Direct Tap (loading audio data… 0.0s)"
+        let target = tap.activeTargetName
+        self.audioTapSource = "Direct Tap • \(target) (buffering…)"
         NSLog("MVPrivateAudioTap active for Apple Music: %@", tap.diagnostic)
       } else {
         self.audioTapSource = "Acoustic Tap (Microphone Fallback)"
@@ -264,6 +266,7 @@ final class LocalMusicPlayer {
       }
 #endif
       var monitorTicks = 0
+      var strategyRotationTicks = 0
       musicMonitor = Task { @MainActor [weak self, weak model] in
         while !Task.isCancelled {
           try? await Task.sleep(for: .milliseconds(300))
@@ -289,12 +292,26 @@ final class LocalMusicPlayer {
             }
           } else if self.isPlaying && !self.userStoppedMicrophone {
             let elapsed = Double(monitorTicks) * 0.3
-            if elapsed < 8.0 {
-              // Allow generous buffer window for Apple Music stream & FairPlay audio data loading
-              self.audioTapSource = String(format: "Direct Tap (loading audio data… %.1fs)", elapsed)
-            } else if model?.listening != true {
-              self.audioTapSource = "Acoustic Tap (Microphone Fallback)"
-              await model?.start()
+            let playbackTime = music.playbackTime
+            if playbackTime < 0.25 {
+              let target = self.privateTap?.activeTargetName ?? "Direct"
+              self.audioTapSource = String(format: "Direct Tap • %@ (buffering… %.1fs)", target, elapsed)
+            } else {
+              strategyRotationTicks += 1
+              let target = self.privateTap?.activeTargetName ?? "Direct"
+              let currentStrategyElapsed = Double(strategyRotationTicks) * 0.3
+              self.audioTapSource = String(format: "Direct Tap • %@ (probing… %.1fs)", target, currentStrategyElapsed)
+              let rotationThreshold = (target.contains("mViz App")) ? 14 : 8
+              if strategyRotationTicks >= rotationThreshold {
+                strategyRotationTicks = 0
+                let switched = self.privateTap?.switchToNextStrategy(handler: tapHandler) ?? false
+                if !switched {
+                  if model?.listening != true && !self.userStoppedMicrophone {
+                    self.audioTapSource = "Acoustic Tap (Microphone Fallback)"
+                    await model?.start()
+                  }
+                }
+              }
             }
           }
 #else

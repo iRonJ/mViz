@@ -27,7 +27,7 @@ extension ParticleField {
           roomMaterials = (0..<8).map { _ in UnlitMaterial(color: .white) }
         }
         for b in 0..<8 {
-          let hsv = reactiveColor(bands: envelope, offset: Float(b) * 0.025)
+          let hsv = reactiveColor(bands: envelope, offset: Float(b) * 0.025 + beatPulse.paletteHue)
           let color = UIColor(
             hue: CGFloat(hsv.x), saturation: CGFloat(hsv.y), brightness: CGFloat(hsv.z), alpha: 1)
           roomMaterials[b] = UnlitMaterial(color: color)
@@ -53,7 +53,8 @@ extension ParticleField {
       spawnBudget = 0
       return
     }
-    spawnBudget = min(4, spawnBudget + dt * (12 + envelope.x * 30) * model.intensity * weight)
+    let bassPunch = pow(envelope.x, 1.25)
+    spawnBudget = min(4, spawnBudget + dt * (12 + bassPunch * 45) * model.intensity * weight)
     while spawnBudget >= 1 {
       spawnBudget -= 1
       guard let index = roomParticles.firstIndex(where: { !$0.entity.isEnabled }) else { break }
@@ -66,7 +67,7 @@ extension ParticleField {
       }
       particle.components.set(
         PhysicsMotionComponent(
-          linearVelocity: [cos(angle) * 0.8, 0.6 + envelope.x * 1.8, sin(angle) * 0.8]
+          linearVelocity: [cos(angle) * (0.8 + bassPunch * 0.6), 0.6 + bassPunch * 2.2, sin(angle) * (0.8 + bassPunch * 0.6)]
             * MotionRate(model.motionSpeed).multiplier))
       roomParticles[index].age = 0
       particle.isEnabled = true

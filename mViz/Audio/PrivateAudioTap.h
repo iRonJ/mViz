@@ -17,6 +17,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (BOOL)startForPID:(int)pid handler:(void (^)(const float *samples, uint32_t count))handler;
 - (BOOL)startDefaultWithHandler:(void (^)(const float *samples, uint32_t count))handler;
+- (BOOL)switchToNextStrategyWithHandler:(void (^)(const float *samples, uint32_t count))handler;
 - (void)stop;
 - (NSString *)tapIvarsSummary;
 + (NSString *)runDiagnosticProbe;

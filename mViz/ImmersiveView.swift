@@ -146,7 +146,6 @@ struct ImmersiveView: View {
             }
             Button("Leave", systemImage: "xmark") {
               autohideTask?.cancel()
-              openWindow(id: "main")
               Task { await dismissSpace() }
             }
           }

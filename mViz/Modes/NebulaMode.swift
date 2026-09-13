@@ -11,4 +11,14 @@ struct NebulaMode: MotionPattern {
     let r: Float = R * sqrt(cos(theta) * cos(theta) + sin(theta) * sin(theta) * cos(alpha) * cos(alpha))
     return [r, y, 0]
   }
+
+  func dynamics(bass: Float) -> ModeDynamics {
+    let b = min(1, max(0, bass))
+    return ModeDynamics(
+      speedBoost: b * 0.65,
+      spreadBoost: 0.04 + b * 0.35,
+      birthBoost: b * 0.75,
+      sizeScale: 0.9 + b * 0.45
+    )
+  }
 }

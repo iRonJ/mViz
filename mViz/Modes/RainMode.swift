@@ -10,8 +10,17 @@ struct RainMode: MotionPattern {
     return [r, y, 0]
   }
   func dynamics(bass: Float) -> ModeDynamics {
-    ModeDynamics(
-      direction: [0, -1, 0], speedBoost: 1.1, gravity: -0.5,
-      spreadBoost: 0, birthBoost: 0, lifeSpan: 3.5, stretch: 5, sizeScale: 0.65, form: .plane)
+    let b = min(1, max(0, bass))
+    return ModeDynamics(
+      direction: [0, -1, 0],
+      speedBoost: 0.15 + b * 2.35,
+      gravity: -0.25 - b * 0.95,
+      spreadBoost: b * 0.12,
+      birthBoost: b * 0.9,
+      lifeSpan: 3.5,
+      stretch: 2.0 + b * 5.0,
+      sizeScale: 0.55 + b * 0.35,
+      form: .plane
+    )
   }
 }

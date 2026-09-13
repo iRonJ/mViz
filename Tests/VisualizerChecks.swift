@@ -253,3 +253,31 @@ for i in 0..<12 {
 }
 print("PASS: SpectralFluxFollower vectorized tracking, blended dynamics, and StagePositionable polymorphism")
 
+// Mode dynamic range & low resting baseline verification
+let volcanoZero = MotionMode.volcano.definition.dynamics(bass: 0)
+let volcanoOne = MotionMode.volcano.definition.dynamics(bass: 1)
+precondition(volcanoZero.speedBoost <= 0.25, "Volcano resting speed too high: \(volcanoZero.speedBoost)")
+precondition(volcanoOne.speedBoost >= 3.5, "Volcano peak speed too low: \(volcanoOne.speedBoost)")
+precondition(volcanoOne.speedBoost / volcanoZero.speedBoost >= 15.0, "Volcano dynamic range insufficient")
+precondition(volcanoZero.spreadBoost <= 0.1)
+precondition(volcanoOne.spreadBoost >= 0.4)
+
+let rainZero = MotionMode.rain.definition.dynamics(bass: 0)
+let rainOne = MotionMode.rain.definition.dynamics(bass: 1)
+precondition(rainZero.speedBoost <= 0.2, "Rain resting speed too high: \(rainZero.speedBoost)")
+precondition(rainOne.speedBoost >= 2.2, "Rain peak speed too low: \(rainOne.speedBoost)")
+precondition(rainOne.speedBoost / rainZero.speedBoost >= 10.0, "Rain dynamic range insufficient")
+precondition((rainZero.stretch ?? 0) <= 2.5)
+precondition((rainOne.stretch ?? 0) >= 6.5)
+precondition(rainOne.birthBoost >= 0.8)
+
+for mode in MotionMode.allCases {
+    let d0 = mode.definition.dynamics(bass: 0)
+    let d1 = mode.definition.dynamics(bass: 1)
+    precondition(d0.birthBoost <= d1.birthBoost, "Monotonicity violated in mode \(mode)")
+    precondition(d1.birthBoost <= 1.0, "Birth boost exceeded 1.0 in mode \(mode)")
+    precondition(d0.speedBoost.isFinite && d1.speedBoost.isFinite)
+}
+print("PASS: low base emitter rate/speed and wide dynamic range across all visualization modes")
+
+

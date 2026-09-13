@@ -73,8 +73,8 @@ final class FlurrySpectrumField {
         SIMD3<Float>(
           reduceMotion ? 0 : 0.65 * sin(time * 0.55 + phase), 1,
           reduceMotion ? 0 : 0.22 * cos(time * 0.4 + phase)))
-      let fluxBoost = transientDynamics ? bandFlux * 0.40 : 0
-      particles.speed = (reduceMotion ? 0.12 : 0.25 + pow(level, 1.1) * 0.45 + fluxBoost) * rate
+      let fluxBoost = transientDynamics ? bandFlux * 0.50 : 0
+      particles.speed = (reduceMotion ? 0.08 : 0.08 + pow(level, 1.1) * 0.65 + fluxBoost) * rate
 
       // Frequency-specific wisp dynamics with rate-of-change transient boost:
       let wispActivity = min(1.0, max(0.0, (level - 0.01) / 0.08))

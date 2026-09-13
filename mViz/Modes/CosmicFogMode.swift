@@ -15,15 +15,16 @@ struct CosmicFogMode: MotionPattern {
   }
 
   func dynamics(bass: Float) -> ModeDynamics {
-    ModeDynamics(
+    let b = min(1, max(0, bass))
+    return ModeDynamics(
       direction: nil,
-      speedBoost: -0.04, // slow atmospheric drifting mist
+      speedBoost: -0.05 + b * 0.28,
       gravity: 0,
-      spreadBoost: 0.75, // wide diffuse volumetric mist
-      birthBoost: 0.6 * bass, // volumetric cloud breathes with the music
-      lifeSpan: 3.8, // long-lived drifting fog
+      spreadBoost: 0.55 + b * 0.45,
+      birthBoost: b * 0.85,
+      lifeSpan: 3.8,
       stretch: nil,
-      sizeScale: 2.2, // large soft volumetric particle cloud
+      sizeScale: 1.7 + b * 1.0,
       form: .plane
     )
   }

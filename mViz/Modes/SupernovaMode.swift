@@ -26,15 +26,16 @@ struct SupernovaMode: MotionPattern {
   }
 
   func dynamics(bass: Float) -> ModeDynamics {
-    ModeDynamics(
+    let b = min(1, max(0, bass))
+    return ModeDynamics(
       direction: nil,
-      speedBoost: 0.25 + bass * 0.65, // relativistic acceleration on bass drops
+      speedBoost: 0.06 + b * 1.24, // relativistic blast on bass drops
       gravity: 0,
-      spreadBoost: 0.15 + bass * 0.3,
-      birthBoost: 0.8 * bass,
+      spreadBoost: 0.08 + b * 0.38,
+      birthBoost: b * 0.9,
       lifeSpan: 2.2,
-      stretch: 2.2 + bass * 1.2, // relativistic streak distortion
-      sizeScale: 1.15 + bass * 0.4,
+      stretch: 1.4 + b * 2.8, // relativistic streak distortion
+      sizeScale: 0.95 + b * 0.6,
       form: .cone
     )
   }

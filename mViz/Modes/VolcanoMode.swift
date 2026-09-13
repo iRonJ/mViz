@@ -14,9 +14,18 @@ struct VolcanoMode: MotionPattern {
     return [r, y, 0]
   }
   func dynamics(bass: Float) -> ModeDynamics {
-    ModeDynamics(
-      direction: [0, 1, 0], speedBoost: 1.5 + bass * 3, gravity: -1.8,
-      spreadBoost: 0.3, birthBoost: bass, lifeSpan: 3.5, stretch: nil, sizeScale: 1, form: .cone)
+    let b = min(1, max(0, bass))
+    return ModeDynamics(
+      direction: [0, 1, 0],
+      speedBoost: 0.18 + b * 3.82,
+      gravity: -0.7 - b * 1.5,
+      spreadBoost: 0.06 + b * 0.38,
+      birthBoost: b,
+      lifeSpan: 3.5,
+      stretch: 0.8 + b * 1.8,
+      sizeScale: 1,
+      form: .cone
+    )
   }
 
   #if canImport(UIKit)

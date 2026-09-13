@@ -330,9 +330,9 @@ final class ParticleField {
         index < 10 ? geq10Envelope[index] : (index == 10 ? envelope.x : envelope.z)
 
       // 2. Mid-range frequencies track particle emission rate & density (whisper floor in silence)
-      let baseFloor = 2.0 + activity * 18.0
+      let baseFloor = 1.0 + activity * 7.0
       var baseBirthRate =
-        (baseFloor + midDensity * 360 + midBandBoost * 140 + bandEnergy * 50) * model.intensity
+        (baseFloor + midDensity * 420 + midBandBoost * 160 + bandEnergy * 60) * model.intensity
         * (1 - blend[.room] * (surfacesAvailable ? 0.85 : 0))
       if index >= 3 && index <= 6 {
         baseBirthRate *= 1.25  // Melodic mid-frequency emitters carry extra lush density
@@ -341,10 +341,10 @@ final class ParticleField {
       particles.mainEmitter.lifeSpan = Double(2.5 + aurora * 0.8)
 
       // Particle size expands with punchy bass hits and pulses directly on the beat!
-      // In silence/quiet: drops to 0.002m (tiny specks). Active: scales up to 0.050m+ on kicks.
-      let baseParticleSize: Float = 0.002 + activity * 0.006
+      // In silence/quiet: drops to 0.0015m (tiny specks). Active: scales up to 0.055m+ on kicks.
+      let baseParticleSize: Float = 0.0015 + activity * 0.0045
       var dynamicSize: Float =
-        (baseParticleSize + bassPunch * 0.034 + beatPulseIntensity * 0.018 + lowBandBoost * 0.016)
+        (baseParticleSize + bassPunch * 0.038 + beatPulseIntensity * 0.020 + lowBandBoost * 0.018)
         * activeDynamics.sizeScale
       if index < 3 {
         dynamicSize *= 1.35  // Bass/sub-bass emitters form heavier celestial bodies
@@ -380,7 +380,7 @@ final class ParticleField {
       particles.mainEmitter.acceleration = .zero
 
       // Mid frequencies propel velocity and forward swirl
-      particles.speed = 0.12 + midSpeed * 0.85 + vortex * 0.25
+      particles.speed = 0.07 + midSpeed * 0.95 + vortex * 0.25
       particles.speed += blendedDynamics.speedBoost
       particles.mainEmitter.acceleration.y += blendedDynamics.gravity
       particles.mainEmitter.birthRate = baseBirthRate * blendedDynamics.birthMultiplier

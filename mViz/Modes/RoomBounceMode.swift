@@ -10,4 +10,12 @@ struct RoomBounceMode: MotionPattern {
     let r: Float = 0.25 + 2.35 * sqrt(max(0, 1 - u * u))
     return [r, y, 0]
   }
+
+  func dynamics(bass: Float) -> ModeDynamics {
+    let b = min(1, max(0, bass))
+    return ModeDynamics(
+      speedBoost: 0.04 + b * 0.85,
+      birthBoost: b * 0.75
+    )
+  }
 }

@@ -193,4 +193,4 @@ See [the reactivity review](Docs/AudioReactivityReview.md) and [private audio re
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is dedicated to the public domain under [The Unlicense](LICENSE) — free for any use (personal or commercial) without attribution required.

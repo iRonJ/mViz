@@ -73,6 +73,7 @@ final class VisualizerModel {
   }
   var sensitivity: Float = 3
   var logarithmicLevels = true
+  var transientDynamics = true
   var intensity: Float = 0.7
   var particleSize: Float = 0.7
   var demo = false
@@ -81,6 +82,8 @@ final class VisualizerModel {
   var listening = false
   var geqLevels: SIMD3<Float> = .zero
   var geq10Levels: SIMD16<Float> = .zero
+  var macroFlux: SIMD3<Float> = .zero
+  var geq10Flux: SIMD16<Float> = .zero
 
   var status = "Ready • select music or start microphone"
   private var engine: AVAudioEngine?

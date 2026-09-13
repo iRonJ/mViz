@@ -10,6 +10,9 @@ struct VisualizerControls: View {
       Toggle("Logarithmic audio response", isOn: $model.logarithmicLevels)
       Text("Lifts quieter musical details. Turn off to compare with linear response.")
         .font(.caption).foregroundStyle(.secondary)
+      Toggle("Transient rate-of-change dynamics", isOn: $model.transientDynamics)
+      Text("Drives particle bursts and sizzle from frequency changes rather than sustained volume.")
+        .font(.caption).foregroundStyle(.secondary)
       Picker(
         "Movement",
         selection: Binding(

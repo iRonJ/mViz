@@ -53,6 +53,14 @@ struct VUMeterView: View {
       HStack {
         Label("10-Band Graphic Equalizer & VU", systemImage: "waveform")
           .font(.subheadline.bold())
+        if model.transientDynamics {
+          Text("Δ DYNAMICS")
+            .font(.system(size: 8, weight: .bold, design: .monospaced))
+            .foregroundStyle(.teal)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(.teal.opacity(0.15), in: Capsule())
+        }
         Spacer()
         HStack(spacing: 5) {
           Circle()
@@ -79,6 +87,7 @@ struct VUMeterView: View {
       HStack(alignment: .bottom, spacing: 6) {
         ForEach(0..<10, id: \.self) { band in
           let level = max(0, min(1, geq10[band]))
+          let flux = max(0, min(1, model.geq10Flux[band]))
           VStack(spacing: 3) {
             ZStack(alignment: .bottom) {
               RoundedRectangle(cornerRadius: 3)
@@ -91,6 +100,17 @@ struct VUMeterView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: max(2, CGFloat(level) * 38))
                 .animation(.easeOut(duration: 0.08), value: level)
+
+              // Transient rate-of-change pip indicator
+              if model.transientDynamics && flux > 0.06 {
+                Circle()
+                  .fill(Color.white)
+                  .frame(width: 4, height: 4)
+                  .shadow(color: bandColor(band), radius: 3)
+                  .offset(y: -max(2, CGFloat(level) * 38) + 2)
+                  .opacity(Double(flux))
+                  .animation(.easeOut(duration: 0.06), value: flux)
+              }
             }
             Text(Self.bandLabels[band])
               .font(.system(size: 8, weight: .semibold, design: .monospaced))

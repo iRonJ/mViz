@@ -50,8 +50,9 @@ final class FlurrySpectrumField {
   }
 
   func update(
-    levels: SIMD16<Float>, time: Float, weight: Float, intensity: Float,
-    speed: Float, reduceMotion: Bool, particleSize: Float
+    levels: SIMD16<Float>, flux: SIMD16<Float> = .zero, time: Float, weight: Float,
+    intensity: Float, speed: Float, reduceMotion: Bool, particleSize: Float,
+    transientDynamics: Bool = true
   ) {
     root.isEnabled = weight > 0.001
     guard root.isEnabled else { return }
@@ -59,6 +60,7 @@ final class FlurrySpectrumField {
     let rate = MotionRate(speed).multiplier
     for band in 0..<FlurrySpectrumMode.bandCount {
       let level = levels[band].isFinite ? min(1, max(0, levels[band])) : 0
+      let bandFlux = flux[band].isFinite ? min(1, max(0, flux[band])) : 0
       let base = mode.basePosition(band: band)
       let height = mode.barHeight(level: level)
       bars[band].scale = [0.13, height, 0.045]
@@ -71,27 +73,29 @@ final class FlurrySpectrumField {
         SIMD3<Float>(
           reduceMotion ? 0 : 0.65 * sin(time * 0.55 + phase), 1,
           reduceMotion ? 0 : 0.22 * cos(time * 0.4 + phase)))
-      particles.speed = (reduceMotion ? 0.12 : 0.25 + pow(level, 1.1) * 0.45) * rate
+      let fluxBoost = transientDynamics ? bandFlux * 0.40 : 0
+      particles.speed = (reduceMotion ? 0.12 : 0.25 + pow(level, 1.1) * 0.45 + fluxBoost) * rate
 
-      // Frequency-specific wisp dynamics:
+      // Frequency-specific wisp dynamics with rate-of-change transient boost:
       let wispActivity = min(1.0, max(0.0, (level - 0.01) / 0.08))
+      let effectiveLevel = transientDynamics ? (level * 0.4 + bandFlux * 0.6) : level
       if band < 3 {
-        // Low bands: bass pumps particle size
-        particles.mainEmitter.size = 0.003 + wispActivity * 0.019 + pow(level, 1.25) * 0.035
+        // Low bands: bass punch pumps particle size
+        particles.mainEmitter.size = 0.003 + wispActivity * 0.019 + pow(effectiveLevel, 1.25) * 0.035
         particles.mainEmitter.birthRate =
-          (wispActivity * 12 + pow(level, 1.1) * 110) * max(0, min(1, intensity)) * weight
+          (wispActivity * 12 + pow(effectiveLevel, 1.1) * 110) * max(0, min(1, intensity)) * weight
         particles.mainEmitter.noiseStrength = reduceMotion ? 0.02 : 0.15
         particles.mainEmitter.noiseAnimationSpeed = rate * 0.35
       } else if band < 7 {
-        // Mid bands: melodic energy surges birth rate
-        particles.mainEmitter.size = 0.003 + wispActivity * 0.017 + level * 0.015
+        // Mid bands: melodic energy surges birth rate on attacks
+        particles.mainEmitter.size = 0.003 + wispActivity * 0.017 + effectiveLevel * 0.015
         particles.mainEmitter.birthRate =
-          (wispActivity * 15 + pow(level, 1.2) * 180) * max(0, min(1, intensity)) * weight
+          (wispActivity * 15 + pow(effectiveLevel, 1.2) * 180) * max(0, min(1, intensity)) * weight
         particles.mainEmitter.noiseStrength = reduceMotion ? 0.02 : 0.22
         particles.mainEmitter.noiseAnimationSpeed = rate * 0.4
       } else {
         // High bands: high-frequency sizzle and sparkle
-        let sizzle = pow(level, 1.2)
+        let sizzle = pow(effectiveLevel, 1.2)
         particles.mainEmitter.size = 0.003 + wispActivity * 0.012 + sizzle * 0.012
         particles.mainEmitter.birthRate =
           (wispActivity * 8 + sizzle * 120) * max(0, min(1, intensity)) * weight

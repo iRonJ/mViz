@@ -28,6 +28,12 @@ final class ParticleField {
   var envelope = SIMD3<Float>.zero
   private var linearBassEnvelope: Float = 0
   var geq10Envelope = SIMD16<Float>.zero
+  private var previousSignal = SIMD3<Float>.zero
+  private var baselineFollower = SIMD3<Float>.zero
+  var fluxEnvelope = SIMD3<Float>.zero
+  private var previousSignal10 = SIMD16<Float>.zero
+  private var baselineFollower10 = SIMD16<Float>.zero
+  var geq10FluxEnvelope = SIMD16<Float>.zero
   var blend = MotionBlend()
   var activeMode = MotionMode.orbit
   var wasAutomatic = true
@@ -173,15 +179,45 @@ final class ParticleField {
     }
     model.geqLevels = envelope
 
+    // Macro bands flux (rate-of-change & adaptive contrast follower):
+    let dtClamped = max(0.005, dt)
+    let rawDelta = max(SIMD3<Float>.zero, signal - previousSignal)
+    let instantDerivative = min(SIMD3<Float>(repeating: 1.0), (rawDelta / dtClamped) * 0.22)
+    previousSignal = signal
+
+    for i in 0..<3 {
+      let baseRate: Float = signal[i] > baselineFollower[i] ? 2.5 : 1.8
+      baselineFollower[i] += (signal[i] - baselineFollower[i]) * (1 - exp(-dt * baseRate))
+      let contrast = max(0, signal[i] - baselineFollower[i]) / max(0.2, 1.0 - baselineFollower[i] * 0.5)
+      let targetFlux = min(1.0, max(instantDerivative[i], contrast * 0.9))
+      let fluxRate: Float = targetFlux > fluxEnvelope[i] ? 65 : 16
+      fluxEnvelope[i] += (targetFlux - fluxEnvelope[i]) * (1 - exp(-dt * fluxRate))
+    }
+    model.macroFlux = fluxEnvelope
+
     let raw10 = model.bands10 * model.sensitivity * 8
+    var sig10 = SIMD16<Float>.zero
     for i in 0..<10 {
       let sig = AudioLevelCurve.map(raw10[i], logarithmic: model.logarithmicLevels)
+      sig10[i] = sig
       let attack: Float = i < 3 ? 50 : (i < 7 ? 55 : 70)
       let decay: Float = i < 3 ? 12 : (i < 7 ? 16 : 24)
       let rate: Float = sig > geq10Envelope[i] ? attack : decay
       geq10Envelope[i] += (sig - geq10Envelope[i]) * (1 - exp(-dt * rate))
+
+      // 10-band rate-of-change flux:
+      let rawDelta10 = max(0, sig - previousSignal10[i])
+      let instant10 = min(1.0, (rawDelta10 / dtClamped) * 0.22)
+      let baseRate10: Float = sig > baselineFollower10[i] ? 2.5 : 1.8
+      baselineFollower10[i] += (sig - baselineFollower10[i]) * (1 - exp(-dt * baseRate10))
+      let contrast10 = max(0, sig - baselineFollower10[i]) / max(0.2, 1.0 - baselineFollower10[i] * 0.5)
+      let targetFlux10 = min(1.0, max(instant10, contrast10 * 0.9))
+      let fluxRate10: Float = targetFlux10 > geq10FluxEnvelope[i] ? 65 : 16
+      geq10FluxEnvelope[i] += (targetFlux10 - geq10FluxEnvelope[i]) * (1 - exp(-dt * fluxRate10))
     }
+    previousSignal10 = sig10
     model.geq10Levels = geq10Envelope
+    model.geq10Flux = geq10FluxEnvelope
     let pulseWeight: Float
     let strobeWeight: Float
     switch model.beatLighting {
@@ -244,9 +280,9 @@ final class ParticleField {
       model.particleStyle == .evolving
       ? Self.evolvingStyles[Int(shapeTime / 12) % Self.evolvingStyles.count] : model.particleStyle
     flurry.update(
-      levels: geq10Envelope, time: time, weight: blend[.flurry],
+      levels: geq10Envelope, flux: geq10FluxEnvelope, time: time, weight: blend[.flurry],
       intensity: model.intensity, speed: model.motionSpeed, reduceMotion: model.reduceMotion,
-      particleSize: model.particleSize)
+      particleSize: model.particleSize, transientDynamics: model.transientDynamics)
     let stageWeight = blend[.line] + blend[.grid]
     let frontWeight = min(1, stageWeight + blend[.flurry])
     if stageWeight < 0.001 {
@@ -298,9 +334,16 @@ final class ParticleField {
     updateRoom(dt: dt, weight: blend[.room], model: model)
     let activeDynamics = activeMode.definition.dynamics(bass: envelope.x)
     let planeWeight = stageWeight > 0.001 ? blend[.grid] / stageWeight : 0
-    let bassPunch = pow(envelope.x, 1.25)
-    let midDensity = pow(envelope.y, 1.2)
-    let midSpeed = pow(envelope.y, 1.1)
+    let useFlux = model.transientDynamics
+    let bassPunch: Float = useFlux
+      ? (pow(envelope.x, 1.3) * 0.35 + pow(fluxEnvelope.x, 1.2) * 0.65)
+      : pow(envelope.x, 1.25)
+    let midDensity: Float = useFlux
+      ? (pow(envelope.y, 1.2) * 0.35 + pow(fluxEnvelope.y, 1.2) * 0.65)
+      : pow(envelope.y, 1.2)
+    let midSpeed: Float = useFlux
+      ? (pow(envelope.y, 1.1) * 0.40 + pow(fluxEnvelope.y, 1.1) * 0.60)
+      : pow(envelope.y, 1.1)
     let totalEnergy = max(linearBassEnvelope, max(envelope.x, max(envelope.y, envelope.z)))
     let activity = min(1.0, max(0.0, (totalEnergy - 0.008) / 0.10))
     let beatPulseIntensity = beatPulse.beatIntensity
@@ -313,10 +356,19 @@ final class ParticleField {
       let currentPos = blend.position(phase: phase, time: time, bass: envelope.x)
 
       particles.emitterShape = currentForm.shape
-      let lowBandBoost: Float = index < 3 ? pow(geq10Envelope[index], 1.2) : 0
-      let midBandBoost: Float = (index >= 3 && index <= 6) ? pow(geq10Envelope[index], 1.15) : 0
-      let highBandBoost: Float = (index >= 7 && index <= 9) ? pow(geq10Envelope[index], 1.2) : 0
-      let trebleSizzle = pow(max(envelope.z, highBandBoost), 1.25)
+      let lowBandBoost: Float = index < 3
+        ? (useFlux ? (pow(geq10Envelope[index], 1.2) * 0.4 + pow(geq10FluxEnvelope[index], 1.2) * 0.6) : pow(geq10Envelope[index], 1.2))
+        : 0
+      let midBandBoost: Float = (index >= 3 && index <= 6)
+        ? (useFlux ? (pow(geq10Envelope[index], 1.15) * 0.4 + pow(geq10FluxEnvelope[index], 1.15) * 0.6) : pow(geq10Envelope[index], 1.15))
+        : 0
+      let highBandBoost: Float = (index >= 7 && index <= 9)
+        ? (useFlux ? (pow(geq10Envelope[index], 1.2) * 0.3 + pow(geq10FluxEnvelope[index], 1.2) * 0.7) : pow(geq10Envelope[index], 1.2))
+        : 0
+
+      let highEnergy = max(envelope.z, highBandBoost)
+      let highFlux = max(fluxEnvelope.z, (index >= 7 && index <= 9) ? geq10FluxEnvelope[index] : fluxEnvelope.z)
+      let trebleSizzle = pow(useFlux ? (highEnergy * 0.3 + highFlux * 0.7) : highEnergy, 1.25)
 
       // 1. Bass tracks particle size and emitter shape expansion
       particles.emitterShapeSize = currentForm.dimensions * shapeScale * (0.85 + bassPunch * 0.75)
@@ -367,7 +419,7 @@ final class ParticleField {
       let (emitterStartColor, emitterEndColor) = reactiveEmitterColors(
         baseHue: baseEmitterHue,
         bands: envelope,
-        highFrequency: max(envelope.z, highBandBoost),
+        highFrequency: useFlux ? (highEnergy * 0.3 + highFlux * 0.7) : highEnergy,
         hueOffset: beatPulse.paletteHue,
         beatPulse: beatPulseIntensity,
         activity: activity
@@ -458,7 +510,7 @@ final class ParticleField {
         let (stageStart, stageEnd) = reactiveEmitterColors(
           baseHue: Float(pair) * 0.12,
           bands: envelope,
-          highFrequency: max(envelope.z, highBandBoost),
+          highFrequency: useFlux ? (highEnergy * 0.3 + highFlux * 0.7) : highEnergy,
           hueOffset: beatPulse.paletteHue,
           beatPulse: beatPulseIntensity,
           activity: activity

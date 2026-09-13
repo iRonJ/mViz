@@ -25,15 +25,13 @@ final class ParticleField {
   var time: Float = 0
   var journeyTime: Float = 0
   var shapeTime: Float = 0
-  var envelope = SIMD3<Float>.zero
+  private var macroTracker = SpectralFluxFollower<SIMD3<Float>>()
+  private var geq10Tracker = SpectralFluxFollower<SIMD16<Float>>()
   private var linearBassEnvelope: Float = 0
-  var geq10Envelope = SIMD16<Float>.zero
-  private var previousSignal = SIMD3<Float>.zero
-  private var baselineFollower = SIMD3<Float>.zero
-  var fluxEnvelope = SIMD3<Float>.zero
-  private var previousSignal10 = SIMD16<Float>.zero
-  private var baselineFollower10 = SIMD16<Float>.zero
-  var geq10FluxEnvelope = SIMD16<Float>.zero
+  var envelope: SIMD3<Float> { macroTracker.envelope }
+  var fluxEnvelope: SIMD3<Float> { macroTracker.flux }
+  var geq10Envelope: SIMD16<Float> { geq10Tracker.envelope }
+  var geq10FluxEnvelope: SIMD16<Float> { geq10Tracker.flux }
   var blend = MotionBlend()
   var activeMode = MotionMode.orbit
   var wasAutomatic = true
@@ -51,6 +49,8 @@ final class ParticleField {
   private var lastGlowColor: UIColor?
   private var stageEmittersActive = true
   private var orbitEmittersActive = true
+  private let stageLine: any StagePositionable = MirrorLineMode()
+  private let stageGrid: any StagePositionable = MirrorPlaneMode()
 
   init() {
     var glowMaterial = UnlitMaterial(color: .white)
@@ -106,7 +106,7 @@ final class ParticleField {
       let stage = Entity()
       particles.mainEmitter.birthRate = 0
       stage.components.set(particles)
-      stage.position = MirrorLineMode().stagePosition(index: index, time: 0, bass: 0)
+      stage.position = stageLine.stagePosition(index: index, time: 0, bass: 0)
       stageAnchor.addChild(stage)
       stageEmitters.append(stage)
     }
@@ -173,51 +173,20 @@ final class ParticleField {
     // Treble: razor-sharp attack 70, transient decay 24
     let attackRates: SIMD3<Float> = [50, 55, 70]
     let decayRates: SIMD3<Float> = [12, 16, 24]
-    for i in 0..<3 {
-      let rate: Float = signal[i] > envelope[i] ? attackRates[i] : decayRates[i]
-      envelope[i] += (signal[i] - envelope[i]) * (1 - exp(-dt * rate))
-    }
-    model.geqLevels = envelope
-
-    // Macro bands flux (rate-of-change & adaptive contrast follower):
-    let dtClamped = max(0.005, dt)
-    let rawDelta = max(SIMD3<Float>.zero, signal - previousSignal)
-    let instantDerivative = min(SIMD3<Float>(repeating: 1.0), (rawDelta / dtClamped) * 0.22)
-    previousSignal = signal
-
-    for i in 0..<3 {
-      let baseRate: Float = signal[i] > baselineFollower[i] ? 2.5 : 1.8
-      baselineFollower[i] += (signal[i] - baselineFollower[i]) * (1 - exp(-dt * baseRate))
-      let contrast = max(0, signal[i] - baselineFollower[i]) / max(0.2, 1.0 - baselineFollower[i] * 0.5)
-      let targetFlux = min(1.0, max(instantDerivative[i], contrast * 0.9))
-      let fluxRate: Float = targetFlux > fluxEnvelope[i] ? 65 : 16
-      fluxEnvelope[i] += (targetFlux - fluxEnvelope[i]) * (1 - exp(-dt * fluxRate))
-    }
-    model.macroFlux = fluxEnvelope
+    macroTracker.update(signal: signal, dt: dt, attackRates: attackRates, decayRates: decayRates)
+    model.geqLevels = macroTracker.envelope
+    model.macroFlux = macroTracker.flux
 
     let raw10 = model.bands10 * model.sensitivity * 8
     var sig10 = SIMD16<Float>.zero
     for i in 0..<10 {
-      let sig = AudioLevelCurve.map(raw10[i], logarithmic: model.logarithmicLevels)
-      sig10[i] = sig
-      let attack: Float = i < 3 ? 50 : (i < 7 ? 55 : 70)
-      let decay: Float = i < 3 ? 12 : (i < 7 ? 16 : 24)
-      let rate: Float = sig > geq10Envelope[i] ? attack : decay
-      geq10Envelope[i] += (sig - geq10Envelope[i]) * (1 - exp(-dt * rate))
-
-      // 10-band rate-of-change flux:
-      let rawDelta10 = max(0, sig - previousSignal10[i])
-      let instant10 = min(1.0, (rawDelta10 / dtClamped) * 0.22)
-      let baseRate10: Float = sig > baselineFollower10[i] ? 2.5 : 1.8
-      baselineFollower10[i] += (sig - baselineFollower10[i]) * (1 - exp(-dt * baseRate10))
-      let contrast10 = max(0, sig - baselineFollower10[i]) / max(0.2, 1.0 - baselineFollower10[i] * 0.5)
-      let targetFlux10 = min(1.0, max(instant10, contrast10 * 0.9))
-      let fluxRate10: Float = targetFlux10 > geq10FluxEnvelope[i] ? 65 : 16
-      geq10FluxEnvelope[i] += (targetFlux10 - geq10FluxEnvelope[i]) * (1 - exp(-dt * fluxRate10))
+      sig10[i] = AudioLevelCurve.map(raw10[i], logarithmic: model.logarithmicLevels)
     }
-    previousSignal10 = sig10
-    model.geq10Levels = geq10Envelope
-    model.geq10Flux = geq10FluxEnvelope
+    let geq10Attack = SIMD16<Float>(50, 50, 50, 55, 55, 55, 55, 70, 70, 70, 0, 0, 0, 0, 0, 0)
+    let geq10Decay = SIMD16<Float>(12, 12, 12, 16, 16, 16, 16, 24, 24, 24, 0, 0, 0, 0, 0, 0)
+    geq10Tracker.update(signal: sig10, dt: dt, attackRates: geq10Attack, decayRates: geq10Decay)
+    model.geq10Levels = geq10Tracker.envelope
+    model.geq10Flux = geq10Tracker.flux
     let pulseWeight: Float
     let strobeWeight: Float
     switch model.beatLighting {
@@ -311,25 +280,7 @@ final class ParticleField {
       orbitEmittersActive = true
     }
 
-    var blendedDirection = SIMD3<Float>.zero
-    var blendedDirectionWeight: Float = 0
-    var blendedSpeedBoost: Float = 0
-    var blendedGravity: Float = 0
-    var blendedSpreadBoost: Float = 0
-    var blendedBirthMultiplier: Float = 1
-    for mode in MotionMode.allCases {
-      let weight = blend[mode]
-      guard weight > 0.001 else { continue }
-      let dynamics = mode.definition.dynamics(bass: envelope.x)
-      if let target = dynamics.direction {
-        blendedDirection += target * weight
-        blendedDirectionWeight += weight
-      }
-      blendedSpeedBoost += dynamics.speedBoost * weight
-      blendedGravity += dynamics.gravity * weight
-      blendedSpreadBoost += dynamics.spreadBoost * weight
-      blendedBirthMultiplier += dynamics.birthBoost * weight
-    }
+    let blendedDynamics = blend.dynamics(bass: envelope.x)
 
     updateRoom(dt: dt, weight: blend[.room], model: model)
     let activeDynamics = activeMode.definition.dynamics(bass: envelope.x)
@@ -430,13 +381,13 @@ final class ParticleField {
 
       // Mid frequencies propel velocity and forward swirl
       particles.speed = 0.12 + midSpeed * 0.85 + vortex * 0.25
-      particles.speed += blendedSpeedBoost
-      particles.mainEmitter.acceleration.y += blendedGravity
-      particles.mainEmitter.birthRate = baseBirthRate * blendedBirthMultiplier
+      particles.speed += blendedDynamics.speedBoost
+      particles.mainEmitter.acceleration.y += blendedDynamics.gravity
+      particles.mainEmitter.birthRate = baseBirthRate * blendedDynamics.birthMultiplier
 
-      if blendedDirectionWeight > 0.001 {
+      if blendedDynamics.directionWeight > 0.001 {
         particles.emissionDirection =
-          particles.emissionDirection * (1 - blendedDirectionWeight) + blendedDirection
+          particles.emissionDirection * (1 - blendedDynamics.directionWeight) + blendedDynamics.direction
         let finalDirLen = length(particles.emissionDirection)
         if finalDirLen > 0.001 {
           particles.emissionDirection /= finalDirLen
@@ -453,7 +404,7 @@ final class ParticleField {
       particles.mainEmitter.noiseStrength =
         0.03 + trebleSizzle * 0.35 + (index >= 7 && index <= 9 ? 0.15 : 0)
       particles.mainEmitter.noiseAnimationSpeed = motionRate.multiplier * (1.0 + trebleSizzle * 3.5)
-      particles.mainEmitter.spreadingAngle = 0.28 + trebleSizzle * 0.22 + blendedSpreadBoost
+      particles.mainEmitter.spreadingAngle = 0.28 + trebleSizzle * 0.22 + blendedDynamics.spreadBoost
 
       if let stretch = activeDynamics.stretch { particles.mainEmitter.stretchFactor = stretch }
       if let lifeSpan = activeDynamics.lifeSpan { particles.mainEmitter.lifeSpan = lifeSpan }
@@ -461,20 +412,17 @@ final class ParticleField {
         particles.mainEmitter.stretchFactor *= (1.0 + trebleSizzle * 1.5)
       }
 
-      if activeMode == .volcano {
-        let magmaHue = CGFloat(
-          (0.02 + envelope.x * 0.10 + trebleSizzle * 0.05 + beatPulse.paletteHue * 0.15)
-            .truncatingRemainder(dividingBy: 1.0))
-        let magmaBrightness = CGFloat(min(1.0, 0.18 + activity * 0.47 + beatPulseIntensity * 0.35))
-        let magmaStart = UIColor(
-          hue: magmaHue >= 0 ? magmaHue : magmaHue + 1.0,
-          saturation: CGFloat(max(0.2, 0.85 - trebleSizzle * 0.55)),
-          brightness: magmaBrightness,
-          alpha: 1.0
-        )
+      if let custom = activeMode.definition.customEmitterColor(
+        index: index,
+        envelope: envelope,
+        trebleSizzle: trebleSizzle,
+        paletteHue: beatPulse.paletteHue,
+        beatIntensity: beatPulseIntensity,
+        activity: activity
+      ) {
         particles.mainEmitter.color = .evolving(
-          start: .single(magmaStart),
-          end: .single(.red.withAlphaComponent(0)))
+          start: .single(custom.start),
+          end: .single(custom.end))
       }
       // Speed affects motion, not audio analysis or the 18-second journey timer.
       particles.speed = motionRate.velocity(particles.speed)
@@ -496,8 +444,8 @@ final class ParticleField {
       }
 
       if stageEmittersActive {
-        let line = MirrorLineMode().stagePosition(index: index, time: time, bass: envelope.x)
-        let grid = MirrorPlaneMode().stagePosition(index: index, time: time, bass: envelope.x)
+        let line = stageLine.stagePosition(index: index, time: time, bass: envelope.x)
+        let grid = stageGrid.stagePosition(index: index, time: time, bass: envelope.x)
         stage.position +=
           (line * (1 - planeWeight) + grid * planeWeight - stage.position) * (1 - exp(-dt * 4))
         particles.mainEmitter.birthRate = birthRate * stageWeight

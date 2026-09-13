@@ -61,18 +61,46 @@ enum MotionMode: String, CaseIterable, Identifiable {
   }
 }
 
+#if canImport(UIKit)
+  import UIKit
+#endif
+
 protocol MotionPattern {
   /// radius, height, angular offset from the common orbit
   func pose(phase: Float, time: Float) -> SIMD3<Float>
   func dynamics(bass: Float) -> ModeDynamics
   func angularVelocity(time: Float) -> Float
   var lightingStyle: BeatLightingStyle { get }
+  #if canImport(UIKit)
+    func customEmitterColor(
+      index: Int,
+      envelope: SIMD3<Float>,
+      trebleSizzle: Float,
+      paletteHue: Float,
+      beatIntensity: Float,
+      activity: Float
+    ) -> (start: UIColor, end: UIColor)?
+  #endif
+}
+
+protocol StagePositionable {
+  func stagePosition(index: Int, time: Float, bass: Float) -> SIMD3<Float>
 }
 
 extension MotionPattern {
   func dynamics(bass: Float) -> ModeDynamics { ModeDynamics() }
   func angularVelocity(time: Float) -> Float { 0 }
   var lightingStyle: BeatLightingStyle { .off }
+  #if canImport(UIKit)
+    func customEmitterColor(
+      index: Int,
+      envelope: SIMD3<Float>,
+      trebleSizzle: Float,
+      paletteHue: Float,
+      beatIntensity: Float,
+      activity: Float
+    ) -> (start: UIColor, end: UIColor)? { nil }
+  #endif
 }
 
 struct ModeDynamics {

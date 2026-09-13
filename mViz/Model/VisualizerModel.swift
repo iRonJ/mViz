@@ -8,12 +8,23 @@ final class AudioBandStorage: @unchecked Sendable {
   private var _bands = SIMD3<Float>.zero
   private var _bands10 = SIMD16<Float>.zero
 
+  func update(macro: SIMD3<Float>, geq10: SIMD16<Float>) {
+    os_unfair_lock_lock(&lock)
+    _bands = macro
+    _bands10 = geq10
+    os_unfair_lock_unlock(&lock)
+  }
+
+  func read() -> (bands: SIMD3<Float>, bands10: SIMD16<Float>) {
+    os_unfair_lock_lock(&lock)
+    let b = _bands
+    let b10 = _bands10
+    os_unfair_lock_unlock(&lock)
+    return (b, b10)
+  }
+
   var bands: SIMD3<Float> {
-    get {
-      os_unfair_lock_lock(&lock)
-      defer { os_unfair_lock_unlock(&lock) }
-      return _bands
-    }
+    get { read().bands }
     set {
       os_unfair_lock_lock(&lock)
       _bands = newValue
@@ -22,11 +33,7 @@ final class AudioBandStorage: @unchecked Sendable {
   }
 
   var bands10: SIMD16<Float> {
-    get {
-      os_unfair_lock_lock(&lock)
-      defer { os_unfair_lock_unlock(&lock) }
-      return _bands10
-    }
+    get { read().bands10 }
     set {
       os_unfair_lock_lock(&lock)
       _bands10 = newValue
@@ -151,13 +158,11 @@ final class VisualizerModel {
           domain: "mViz", code: 1,
           userInfo: [NSLocalizedDescriptionKey: "No microphone input is available."])
       }
-      var analyzer = BandAnalyzer()
+      var analyzer = MultiChannelAnalyzer(maxChannels: 1)
       input.installTap(onBus: 0, bufferSize: 512, format: format) { [weak self] buffer, _ in
-        guard let samples = buffer.floatChannelData?[0] else { return }
-        let (macro, geq10) = analyzer.processDetailed(
-          samples, count: Int(buffer.frameLength), sampleRate: buffer.format.sampleRate)
-        self?.bandStorage.bands = macro
-        self?.bandStorage.bands10 = geq10
+        if let (macro, geq10) = analyzer.process(buffer: buffer) {
+          self?.bandStorage.update(macro: macro, geq10: geq10)
+        }
       }
       tapInstalled = true
       capture.prepare()

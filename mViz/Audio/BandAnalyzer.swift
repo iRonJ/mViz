@@ -88,3 +88,44 @@ public struct BandAnalyzer: Sendable {
     return (SIMD3<Float>(bass, mid, high), geq10)
   }
 }
+
+#if canImport(AVFoundation)
+import AVFoundation
+
+/// Manages multiple BandAnalyzer instances across audio channels and reduces them to peak energy.
+public struct MultiChannelAnalyzer: Sendable {
+  private var analyzers: [BandAnalyzer]
+
+  public init(maxChannels: Int = 2) {
+    self.analyzers = (0..<max(1, maxChannels)).map { _ in BandAnalyzer() }
+  }
+
+  public mutating func process(buffer: AVAudioPCMBuffer) -> (macro: SIMD3<Float>, geq10: SIMD16<Float>)? {
+    guard let channels = buffer.floatChannelData else { return nil }
+    let channelCount = min(Int(buffer.format.channelCount), analyzers.count)
+    guard channelCount > 0 else { return nil }
+
+    let count = Int(buffer.frameLength)
+    guard count > 0 else { return nil }
+    let sampleRate = buffer.format.sampleRate
+
+    var combinedMacro = SIMD3<Float>.zero
+    var combined10 = SIMD16<Float>.zero
+
+    for ch in 0..<channelCount {
+      let (macro, geq10) = analyzers[ch].processDetailed(channels[ch], count: count, sampleRate: sampleRate)
+      combinedMacro = SIMD3<Float>(
+        max(combinedMacro.x, macro.x),
+        max(combinedMacro.y, macro.y),
+        max(combinedMacro.z, macro.z)
+      )
+      for b in 0..<10 {
+        combined10[b] = max(combined10[b], geq10[b])
+      }
+    }
+
+    return (combinedMacro, combined10)
+  }
+}
+#endif
+

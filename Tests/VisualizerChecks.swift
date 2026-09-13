@@ -206,3 +206,50 @@ for step in 0...1000 {
 precondition(AudioLevelCurve.map(0.1, logarithmic: true) > 0.25)
 precondition(AudioLevelCurve.map(0.5, logarithmic: true) > 0.7)
 print("PASS: log response endpoints, noise floor, monotonicity, quiet-detail lift, and linear comparison")
+
+// SpectralFluxFollower vectorized tracking & Weber-Fechner adaptive baseline
+var fluxFollower = SpectralFluxFollower<SIMD3<Float>>()
+precondition(fluxFollower.envelope == .zero)
+precondition(fluxFollower.flux == .zero)
+
+// Impulse hit on bass
+fluxFollower.update(
+    signal: SIMD3<Float>(0.9, 0.1, 0.05),
+    dt: 0.016,
+    attackRates: SIMD3<Float>(35, 40, 45),
+    decayRates: SIMD3<Float>(12, 14, 16)
+)
+precondition(fluxFollower.envelope.x > 0.2, "Envelope did not attack on kick")
+precondition(fluxFollower.flux.x > 0.5, "Flux did not fire on onset")
+let initialFlux = fluxFollower.flux.x
+
+// Sustained tone: baseline rises, flux relaxes
+for _ in 0..<30 {
+    fluxFollower.update(
+        signal: SIMD3<Float>(0.9, 0.1, 0.05),
+        dt: 0.016,
+        attackRates: SIMD3<Float>(35, 40, 45),
+        decayRates: SIMD3<Float>(12, 14, 16)
+    )
+}
+precondition(fluxFollower.baseline.x > 0.4, "Baseline failed to follow steady level")
+precondition(fluxFollower.flux.x < initialFlux, "Flux failed to adapt down under sustained signal")
+
+// Dynamics blending via MotionBlend
+let blendedDyn = blend.dynamics(bass: 0.5)
+precondition(blendedDyn.speedBoost.isFinite)
+precondition(blendedDyn.gravity.isFinite)
+precondition(blendedDyn.spreadBoost.isFinite)
+precondition(blendedDyn.birthMultiplier >= 1.0)
+
+// StagePositionable polymorphism
+let stageLineTest: any StagePositionable = MirrorLineMode()
+let stageGridTest: any StagePositionable = MirrorPlaneMode()
+for i in 0..<12 {
+    let pLine = stageLineTest.stagePosition(index: i, time: 0.5, bass: 0.8)
+    let pGrid = stageGridTest.stagePosition(index: i, time: 0.5, bass: 0.8)
+    precondition(pLine.x.isFinite && pLine.y.isFinite && pLine.z.isFinite)
+    precondition(pGrid.x.isFinite && pGrid.y.isFinite && pGrid.z.isFinite)
+}
+print("PASS: SpectralFluxFollower vectorized tracking, blended dynamics, and StagePositionable polymorphism")
+

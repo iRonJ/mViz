@@ -509,24 +509,12 @@ final class LocalMusicPlayer {
       capture.connect(delay, to: capture.mainMixerNode, format: stereoFormat)
 
       let format = stereoFormat
-      var analyzers = Array(repeating: BandAnalyzer(), count: 2)
+      var analyzer = MultiChannelAnalyzer(maxChannels: 2)
       tapMix.installTap(onBus: 0, bufferSize: 512, format: format) {
         [weak model] buffer, _ in
-        guard let channels = buffer.floatChannelData else { return }
-        // Analyze every output channel so hard-panned music still drives visuals.
-        var measured = SIMD3<Float>.zero
-        var measured10 = SIMD16<Float>.zero
-        for channel in 0..<Int(buffer.format.channelCount) {
-          let (macro, geq10) = analyzers[channel].processDetailed(
-            channels[channel], count: Int(buffer.frameLength), sampleRate: buffer.format.sampleRate)
-          measured = SIMD3(
-            max(measured.x, macro.x), max(measured.y, macro.y), max(measured.z, macro.z))
-          for b in 0..<10 {
-            measured10[b] = max(measured10[b], geq10[b])
-          }
+        if let (macro, geq10) = analyzer.process(buffer: buffer) {
+          model?.bandStorage.update(macro: macro, geq10: geq10)
         }
-        model?.bandStorage.bands = measured
-        model?.bandStorage.bands10 = measured10
       }
       tapInstalled = true
       player.scheduleFile(file, at: nil, completionCallbackType: .dataPlayedBack) {

@@ -51,4 +51,33 @@ struct MotionBlend {
     let safeY = pose.y.isFinite && !pose.y.isNaN ? pose.y : 1.5
     return [cos(angle) * safeRadius, safeY, sin(angle) * safeRadius]
   }
+
+  func dynamics(bass: Float) -> BlendedDynamics {
+    var result = BlendedDynamics()
+    let allModes = MotionMode.allCases
+    for index in weights.indices {
+      let weight = weights[index]
+      guard weight > 0.001 else { continue }
+      let dyn = allModes[index].definition.dynamics(bass: bass)
+      if let target = dyn.direction {
+        result.direction += target * weight
+        result.directionWeight += weight
+      }
+      result.speedBoost += dyn.speedBoost * weight
+      result.gravity += dyn.gravity * weight
+      result.spreadBoost += dyn.spreadBoost * weight
+      result.birthMultiplier += dyn.birthBoost * weight
+    }
+    return result
+  }
 }
+
+struct BlendedDynamics {
+  var direction: SIMD3<Float> = .zero
+  var directionWeight: Float = 0
+  var speedBoost: Float = 0
+  var gravity: Float = 0
+  var spreadBoost: Float = 0
+  var birthMultiplier: Float = 1
+}
+

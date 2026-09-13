@@ -1,6 +1,6 @@
 import Foundation
 
-struct MirrorLineMode: MotionPattern {
+struct MirrorLineMode: MotionPattern, StagePositionable {
   var lightingStyle: BeatLightingStyle { .strobe }
   func pose(phase: Float, time: Float) -> SIMD3<Float> {
     [2.8, 1.5, 0]

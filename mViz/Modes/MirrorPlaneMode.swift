@@ -1,6 +1,6 @@
 import Foundation
 
-struct MirrorPlaneMode: MotionPattern {
+struct MirrorPlaneMode: MotionPattern, StagePositionable {
   func pose(phase: Float, time: Float) -> SIMD3<Float> {
     [2.8, 1.5, 0]
   }

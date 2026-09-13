@@ -15,7 +15,7 @@ final class ParticleField {
 
   var emitters: [Entity] = []
   var emitterSlots: [[Entity]] = []
-  var currentSlotStyles: [[ParticleStyle]] = []
+  var activeParticleStyle: ParticleStyle? = nil
   var time: Float = 0
   var journeyTime: Float = 0
   var shapeTime: Float = 0
@@ -43,6 +43,13 @@ final class ParticleField {
   var lastRoomEnvelope = SIMD3<Float>(-1, -1, -1)
   private var lastGlowOpacity: Float = -1
   private var lastGlowColor: UIColor?
+  private var lastColorActivity: Float = -1
+  private var lastPaletteHue: Float = -1
+  private var lastCustomColorActive: Bool = false
+  private var lastAppliedForm: EmitterForm? = nil
+  private var lastAppliedShapeScale: Float = -1
+  /// Toggle to disable the mid-frequency (slot 1) emitter in each triad (~250-2500 Hz).
+  private let midBandEmitterEnabled: Bool = false
 
   init() {
     var glowMaterial = UnlitMaterial(color: .white)
@@ -75,6 +82,9 @@ final class ParticleField {
       root.addChild(particle)
       roomParticles.append((particle, 0))
     }
+    let initialStyle = activeStyle(shapeTime: 0, selectedStyle: .evolving)
+    activeParticleStyle = initialStyle
+
     for index in 0..<12 {
       let entity = Entity()
       entity.name = "Emitter \(index)"
@@ -83,7 +93,6 @@ final class ParticleField {
       emitters.append(entity)
 
       var orbitChildren: [Entity] = []
-      var nodeStyles: [ParticleStyle] = []
 
       for slot in 0..<3 {
         let clusterAngle = Float(slot) * 2 * .pi / 3.0
@@ -98,23 +107,37 @@ final class ParticleField {
         particles.emitterShape = .sphere
         particles.emitterShapeSize = EmitterForm.sphere.dimensions
         particles.birthLocation = .surface
+        particles.birthDirection = .world
+        particles.torusInnerRadius = 0.7
         particles.particlesInheritTransform = false
         particles.mainEmitter.blendMode = .additive
+        particles.mainEmitter.noiseScale = 0.5
+        particles.mainEmitter.noiseAnimationSpeed = 1.0
         particles.mainEmitter.birthRate = 33
         particles.mainEmitter.lifeSpan = slot == 0 ? 2.2 : (slot == 1 ? 1.8 : 1.2)
         particles.mainEmitter.size = slot == 0 ? 0.022 : (slot == 1 ? 0.016 : 0.010)
-        particles.mainEmitter.sizeVariation = 0.006
-        particles.mainEmitter.color = .evolving(start: .single(.cyan), end: .single(.purple))
+        let slotHueOffset: Float = slot == 0 ? -0.04 : (slot == 1 ? 0.0 : 0.06)
+        let baseHue = Float(index) / 12.0 + slotHueOffset
+        let (initStart, initEnd) = reactiveEmitterColors(
+          baseHue: baseHue,
+          bands: .zero,
+          highFrequency: 0,
+          hueOffset: 0,
+          beatPulse: 0,
+          activity: 0.5
+        )
+        particles.mainEmitter.color = .evolving(start: .single(initStart), end: .single(initEnd))
         particles.speed = slot == 0 ? 0.10 : (slot == 1 ? 0.18 : 0.25)
-        let initialStyle = styleFor(slot: slot, nodeIndex: index, shapeTime: 0, selectedStyle: .evolving)
-        applyStyle(initialStyle, to: &particles, slot: slot)
-        nodeStyles.append(initialStyle)
+        applyStyle(initialStyle, to: &particles)
+        if slot == 1 && !midBandEmitterEnabled {
+          child.isEnabled = false
+          particles.mainEmitter.birthRate = 0
+        }
         child.components.set(particles)
         entity.addChild(child)
         orbitChildren.append(child)
       }
       emitterSlots.append(orbitChildren)
-      currentSlotStyles.append(nodeStyles)
     }
   }
 
@@ -264,6 +287,52 @@ final class ParticleField {
     let activity = min(1.0, max(0.0, (totalEnergy - 0.008) / 0.10))
     let beatPulseIntensity = beatPulse.beatIntensity
 
+    let targetStyle = activeStyle(shapeTime: shapeTime, selectedStyle: model.particleStyle)
+    let styleChanged = (targetStyle != activeParticleStyle)
+    if styleChanged {
+      activeParticleStyle = targetStyle
+    }
+
+    let targetShape: ParticleEmitterComponent.EmitterShape
+    if model.shape == .evolving, let form = activeDynamics.form {
+      targetShape = form == .plane ? .plane : .cone
+    } else {
+      targetShape = currentForm.shape
+    }
+
+    let baseStretch: Float = (targetStyle == .sparks ? 2.8 : 1.0)
+    let modeStretch: Float = activeDynamics.stretch ?? 1.0
+    let styleSizeMultiplier: Float = (targetStyle == .rings || targetStyle == .flakes) ? 1.8 : 1.0
+    let styleLifeMultiplier: Double = (targetStyle == .sparks) ? 0.85 : 1.0
+    let baseStyleNoise: Float = (targetStyle == .flakes ? 0.12 : 0.02)
+    let gravityAccel = blendedDynamics.gravity * motionRate.multiplier * motionRate.multiplier
+
+    let isCustomColor = (activeMode.definition.customEmitterColor(
+      index: 0, envelope: envelope, trebleSizzle: 0, paletteHue: beatPulse.paletteHue,
+      beatIntensity: beatPulseIntensity, activity: activity
+    ) != nil)
+    let needColorUpdate = styleChanged
+      || isCustomColor
+      || lastCustomColorActive
+      || beatPulseIntensity > 0.03
+      || stageWeight > 0.001
+      || blend[.aurora] > 0.001
+      || abs(activity - lastColorActivity) > 0.08
+      || abs(beatPulse.paletteHue - lastPaletteHue) > 0.03
+    if needColorUpdate {
+      lastColorActivity = activity
+      lastPaletteHue = beatPulse.paletteHue
+      lastCustomColorActive = isCustomColor
+    }
+
+    let needShapeUpdate = (currentForm != lastAppliedForm)
+      || abs(shapeScale - lastAppliedShapeScale) > 0.02
+      || (model.shape == .evolving && activeDynamics.form != nil)
+    if needShapeUpdate {
+      lastAppliedForm = currentForm
+      lastAppliedShapeScale = shapeScale
+    }
+
     for index in 0..<12 {
       let entity = emitters[index]
       let phase = Float(index) / 12 * 2 * .pi
@@ -330,20 +399,55 @@ final class ParticleField {
         finalDir = blendedDir
       }
 
+      let customColor = isCustomColor
+        ? activeMode.definition.customEmitterColor(
+          index: index,
+          envelope: envelope,
+          trebleSizzle: trebleSizzle,
+          paletteHue: beatPulse.paletteHue,
+          beatIntensity: beatPulseIntensity,
+          activity: activity
+        ) : nil
+
       for slot in 0..<3 {
         let child = emitterSlots[index][slot]
+        if slot == 1 && !midBandEmitterEnabled {
+          if child.isEnabled {
+            child.isEnabled = false
+            if var p = child.components[ParticleEmitterComponent.self] {
+              p.mainEmitter.birthRate = 0
+              child.components.set(p)
+            }
+          }
+          continue
+        }
         guard var particles = child.components[ParticleEmitterComponent.self] else { continue }
 
-        particles.emitterShape = currentForm.shape
-        particles.torusInnerRadius = 0.7
-        particles.birthDirection = .world
+        if styleChanged {
+          applyStyle(targetStyle, to: &particles)
+        }
+
+        if particles.emitterShape != targetShape {
+          particles.emitterShape = targetShape
+        }
+
+        if needShapeUpdate {
+          if model.shape == .evolving, let form = activeDynamics.form {
+            particles.emitterShapeSize = form == .plane ? [1.2, 0.02, 1.2] : [0.3, 0.3, 0.3]
+          } else {
+            particles.emitterShapeSize = currentForm.dimensions * shapeScale
+          }
+        }
+
         particles.emissionDirection = finalDir
-        particles.mainEmitter.acceleration = .zero
-        particles.mainEmitter.acceleration.y += blendedDynamics.gravity
+        if blendedDynamics.gravity != 0 || particles.mainEmitter.acceleration.y != 0 {
+          particles.mainEmitter.acceleration = SIMD3<Float>(0, gravityAccel, 0)
+        }
 
         // 1. Guaranteed active simmer during music + rhythmic burst dynamics
         let slotFloor = (3.5 + activity * 12.0) / 3.0
-        let roomReduction = 1 - blend[.room] * (surfacesAvailable ? 0.85 : 0)
+        let flurryReduction = 1 - blend[.flurry]
+        let roomReduction = (1 - blend[.room] * (surfacesAvailable ? 0.85 : 0)) * flurryReduction
         let requestedBirthRate: Float
 
         let dynamicSize: Float
@@ -352,7 +456,7 @@ final class ParticleField {
         let slotNoise: Float
         let slotSpread: Float
         let slotHueOffset: Float
-        var slotStretch: Float = 1.0
+        let slotStretch: Float
 
         switch slot {
         case 0:  // Bass / Low-frequency slot (~40-250 Hz)
@@ -364,17 +468,16 @@ final class ParticleField {
           requestedBirthRate =
             (slotFloor + bassBurst) * model.intensity * roomReduction
             * blendedDynamics.birthMultiplier
-          let baseSize: Float = 0.006 + activity * 0.007
+          let baseSize: Float = 0.004 + activity * 0.006
           dynamicSize =
-            min(0.038, (baseSize + sustainedBass * 0.016 + bop.x * 0.018 + beatPulseIntensity * 0.012 + lowBandBoost * 0.008)
-            * activeDynamics.sizeScale * 1.2)
+            min(0.024, (baseSize + sustainedBass * 0.012 + bop.x * 0.014 + beatPulseIntensity * 0.010 + lowBandBoost * 0.006)
+            * activeDynamics.sizeScale)
           slotSpeed = 0.12 + sustainedBass * 0.35 + bop.x * 0.45 + blendedDynamics.speedBoost * 0.6
           slotLifespan = activeDynamics.lifeSpan ?? Double(2.2 + aurora * 0.5)
           slotNoise = 0.02 + sustainedBass * 0.03 + bop.x * 0.04
-          slotSpread = 0.20 + blendedDynamics.spreadBoost * 0.6
+          slotSpread = 0.14 + blendedDynamics.spreadBoost * 0.30
           slotHueOffset = -0.04
-          particles.emitterShapeSize =
-            currentForm.dimensions * shapeScale * (0.85 + sustainedBass * 0.45 + bop.x * 0.35)
+          slotStretch = 1.0
 
         case 1:  // Mid / Melodic body slot (~250-2500 Hz)
           let midSustained = sustainedMid * 52.0
@@ -384,16 +487,15 @@ final class ParticleField {
           requestedBirthRate =
             (slotFloor + midBurst) * model.intensity * roomReduction
             * blendedDynamics.birthMultiplier
-          let baseSize: Float = 0.004 + activity * 0.005
+          let baseSize: Float = 0.003 + activity * 0.005
           dynamicSize =
-            min(0.028, (baseSize + sustainedMid * 0.012 + bop.y * 0.014 + midBandBoost * 0.008) * activeDynamics.sizeScale)
+            min(0.018, (baseSize + sustainedMid * 0.010 + bop.y * 0.012 + midBandBoost * 0.006) * activeDynamics.sizeScale)
           slotSpeed = 0.14 + sustainedMid * 0.55 + bop.y * 0.65 + vortex * 0.25 + blendedDynamics.speedBoost
           slotLifespan = activeDynamics.lifeSpan ?? Double(1.8 + aurora * 0.4)
           slotNoise = 0.03 + sustainedMid * 0.05 + bop.y * 0.07
-          slotSpread = 0.28 + blendedDynamics.spreadBoost
+          slotSpread = 0.16 + blendedDynamics.spreadBoost * 0.35
           slotHueOffset = 0.0
-          particles.emitterShapeSize =
-            currentForm.dimensions * shapeScale * (0.75 + sustainedMid * 0.35 + bop.y * 0.25)
+          slotStretch = 1.0
 
         default:  // High / Treble sizzle slot (~2500-16000 Hz)
           let trebleSustained = sustainedTreble * 42.0
@@ -402,89 +504,61 @@ final class ParticleField {
           requestedBirthRate =
             (slotFloor + trebleBurst) * model.intensity * roomReduction
             * blendedDynamics.birthMultiplier
-          let baseSize: Float = 0.0025 + activity * 0.0035
+          let baseSize: Float = 0.002 + activity * 0.003
           dynamicSize =
-            min(0.018, (baseSize + sustainedTreble * 0.008 + bop.z * 0.010) * activeDynamics.sizeScale * 0.75)
+            min(0.014, (baseSize + sustainedTreble * 0.006 + bop.z * 0.008) * activeDynamics.sizeScale * 0.75)
           slotSpeed = 0.16 + sustainedTreble * 0.75 + bop.z * 0.95 + blendedDynamics.speedBoost * 1.1
           slotLifespan = (activeDynamics.lifeSpan ?? Double(1.4 + aurora * 0.3)) * 0.8
-          slotNoise = 0.05 + bop.z * 0.30
-          slotSpread = 0.36 + trebleSizzle * 0.20 + blendedDynamics.spreadBoost * 1.2
+          slotNoise = 0.05 + bop.z * 0.25
+          slotSpread = 0.20 + trebleSizzle * 0.12 + blendedDynamics.spreadBoost * 0.40
           slotHueOffset = 0.06
-          slotStretch = (activeDynamics.stretch ?? 1.0) * (1.5 + (trebleSustained * 0.02 + bop.z * 1.8))
-          particles.emitterShapeSize =
-            currentForm.dimensions * shapeScale * (0.65 + sustainedTreble * 0.30 + bop.z * 0.25)
+          slotStretch = min(2.5, 1.0 + trebleSustained * 0.02 + bop.z * 1.5)
         }
 
-        particles.speed = slotSpeed
-        particles.mainEmitter.size = dynamicSize
-        particles.mainEmitter.lifeSpan = slotLifespan
+        particles.speed = min(max(motionRate.velocity(slotSpeed), 0.05), 6.0)
+        particles.mainEmitter.size = dynamicSize * styleSizeMultiplier * model.particleSize
+        particles.mainEmitter.sizeVariation = (0.001 + activity * 0.005) * model.particleSize
+        particles.mainEmitter.lifeSpan = (slotLifespan * styleLifeMultiplier) / Double(sqrt(motionRate.multiplier))
 
-        // 3. Rotating particle style & texture with state caching
-        let slotStyle = styleFor(
-          slot: slot, nodeIndex: index, shapeTime: shapeTime, selectedStyle: model.particleStyle)
-        if currentSlotStyles[index][slot] != slotStyle {
-          currentSlotStyles[index][slot] = slotStyle
-          applyStyle(slotStyle, to: &particles, slot: slot)
-        }
+        let baseAngular: Float = (targetStyle == .flakes ? 1.4 : 1.0) * (slot == 0 ? 0.35 : (slot == 1 ? 0.85 : 1.9))
+        particles.mainEmitter.angularSpeed = baseAngular * motionRate.multiplier
+        particles.mainEmitter.angularSpeedVariation = particles.mainEmitter.angularSpeed * 0.75
 
-        particles.mainEmitter.noiseStrength = slotNoise
+        particles.mainEmitter.noiseStrength = baseStyleNoise + slotNoise
         particles.mainEmitter.noiseAnimationSpeed =
-          motionRate.multiplier * (1.0 + (slot == 2 ? bop.z * 3.0 : 0.5))
+          motionRate.multiplier * (1.0 + (slot == 2 ? bop.z * 2.5 : 0.5))
         particles.mainEmitter.spreadingAngle = slotSpread
-        if let stretch = activeDynamics.stretch {
-          particles.mainEmitter.stretchFactor = stretch * slotStretch
-        } else {
-          particles.mainEmitter.stretchFactor *= slotStretch
+        particles.mainEmitter.stretchFactor = min(8.0, baseStretch * modeStretch * slotStretch)
+
+        // Symmetrical stage reflection & color ramp update caching
+        if needColorUpdate {
+          let baseEmitterHue = Float(index) / 12.0 + aurora * 0.15 + slotHueOffset
+          let effectiveHue: Float
+          if stageWeight > 0.001 {
+            let pair = activeMode == .grid ? min(index % 4, 3 - index % 4) : min(index, 11 - index)
+            let stageHue = Float(pair) * 0.12 + slotHueOffset
+            effectiveHue = baseEmitterHue * (1 - stageWeight) + stageHue * stageWeight
+          } else {
+            effectiveHue = baseEmitterHue
+          }
+
+          if let custom = customColor {
+            particles.mainEmitter.color = .evolving(
+              start: .single(custom.start),
+              end: .single(custom.end))
+          } else {
+            let (emitterStartColor, emitterEndColor) = reactiveEmitterColors(
+              baseHue: effectiveHue,
+              bands: envelope,
+              highFrequency: useFlux ? (highEnergy * 0.3 + highFlux * 0.7) : highEnergy,
+              hueOffset: beatPulse.paletteHue,
+              beatPulse: beatPulseIntensity,
+              activity: activity
+            )
+            particles.mainEmitter.color = .evolving(
+              start: .single(emitterStartColor), end: .single(emitterEndColor))
+          }
         }
-
-        // 4. Color tuning per slot (with symmetrical stage reflection)
-        let baseEmitterHue = Float(index) / 12.0 + aurora * 0.15 + slotHueOffset
-        let effectiveHue: Float
-        if stageWeight > 0.001 {
-          let pair = activeMode == .grid ? min(index % 4, 3 - index % 4) : min(index, 11 - index)
-          let stageHue = Float(pair) * 0.12 + slotHueOffset
-          effectiveHue = baseEmitterHue * (1 - stageWeight) + stageHue * stageWeight
-        } else {
-          effectiveHue = baseEmitterHue
-        }
-
-        let (emitterStartColor, emitterEndColor) = reactiveEmitterColors(
-          baseHue: effectiveHue,
-          bands: envelope,
-          highFrequency: useFlux ? (highEnergy * 0.3 + highFlux * 0.7) : highEnergy,
-          hueOffset: beatPulse.paletteHue,
-          beatPulse: beatPulseIntensity,
-          activity: activity
-        )
-        particles.mainEmitter.color = .evolving(
-          start: .single(emitterStartColor), end: .single(emitterEndColor))
-
-        if let custom = activeMode.definition.customEmitterColor(
-          index: index,
-          envelope: envelope,
-          trebleSizzle: trebleSizzle,
-          paletteHue: beatPulse.paletteHue,
-          beatIntensity: beatPulseIntensity,
-          activity: activity
-        ) {
-          particles.mainEmitter.color = .evolving(
-            start: .single(custom.start),
-            end: .single(custom.end))
-        }
-
-        if model.shape == .evolving, let form = activeDynamics.form {
-          particles.emitterShape = form == .plane ? .plane : .cone
-          particles.emitterShapeSize = form == .plane ? [1.2, 0.02, 1.2] : [0.3, 0.3, 0.3]
-        }
-
-        // Motion rate adjustments
-        particles.speed = motionRate.velocity(particles.speed)
-        particles.speed = min(max(particles.speed, 0.05), 8.0)
-        particles.mainEmitter.acceleration *= motionRate.multiplier * motionRate.multiplier
-        particles.mainEmitter.angularSpeed *= motionRate.multiplier
-        particles.mainEmitter.lifeSpan /= Double(sqrt(motionRate.multiplier))
-        particles.mainEmitter.size *= model.particleSize
-        particles.mainEmitter.sizeVariation = (0.001 + activity * 0.006) * model.particleSize
 
         let birthRate = ParticleBudget.birthRate(
           requested: requestedBirthRate, lifeSpan: particles.mainEmitter.lifeSpan)

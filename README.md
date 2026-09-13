@@ -136,7 +136,7 @@ mViz features twelve distinct movement kinematics spanning a full 360° celestia
 
 - **VSYNC-Driven 90 FPS Render Loop:** Subscribes natively to RealityKit `SceneEvents.Update`, rendering at native headset refresh rate without timer stalls.
 - **Unified 12-Node Kinematics Pipeline:** All 12 motion modes share a single pre-allocated 12-node pipeline, ensuring instant, zero-hitch transitions between 360° celestial modes and front-facing stage modes (Mirror Line and Mirror Plane) at 90 FPS.
-- **Frequency-Specialized Emitter Triads:** Each visualizer node orchestrates a tight triad cluster of three sub-emitters, each attuned to a different frequency span (low body, mid punch, high shimmer) and distinct particle shapes for rich dynamic reactivity across any musical genre.
+- **Frequency-Specialized Emitter Pipeline:** Visualizer nodes orchestrate specialized frequency sub-emitters (deep resonant bass foundation and glittering treble sizzle) with state-cached GPU color ramps, static geometric CDF tables, tight ribbon spreading, and bounded billboard scales for buttery-smooth 90 FPS rendering on Apple Vision Pro.
 - **Rhythm Bop Dynamics:** Real-time rhythmic transient and envelope tracking maintains energetic visual "bop" even through steady musical grooves, eliminating particle starvation.
 - **Lock-Free Band Storage:** Uses `os_unfair_lock` in `AudioBandStorage` for thread-safe cross-thread transfer between CoreAudio realtime threads and RealityKit frames.
 - **Material Caching:** Room physics particles share pre-allocated `UnlitMaterial` buckets updated only on spectral shifts, eliminating per-frame allocations.

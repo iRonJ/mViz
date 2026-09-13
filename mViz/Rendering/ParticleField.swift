@@ -48,6 +48,8 @@ final class ParticleField {
   private var lastCustomColorActive: Bool = false
   private var lastAppliedForm: EmitterForm? = nil
   private var lastAppliedShapeScale: Float = -1
+  /// Toggle to disable the mid-frequency (slot 1) emitter in each triad (~250-2500 Hz).
+  private let midBandEmitterEnabled: Bool = false
 
   init() {
     var glowMaterial = UnlitMaterial(color: .white)
@@ -127,6 +129,10 @@ final class ParticleField {
         particles.mainEmitter.color = .evolving(start: .single(initStart), end: .single(initEnd))
         particles.speed = slot == 0 ? 0.10 : (slot == 1 ? 0.18 : 0.25)
         applyStyle(initialStyle, to: &particles)
+        if slot == 1 && !midBandEmitterEnabled {
+          child.isEnabled = false
+          particles.mainEmitter.birthRate = 0
+        }
         child.components.set(particles)
         entity.addChild(child)
         orbitChildren.append(child)
@@ -405,6 +411,16 @@ final class ParticleField {
 
       for slot in 0..<3 {
         let child = emitterSlots[index][slot]
+        if slot == 1 && !midBandEmitterEnabled {
+          if child.isEnabled {
+            child.isEnabled = false
+            if var p = child.components[ParticleEmitterComponent.self] {
+              p.mainEmitter.birthRate = 0
+              child.components.set(p)
+            }
+          }
+          continue
+        }
         guard var particles = child.components[ParticleEmitterComponent.self] else { continue }
 
         if styleChanged {

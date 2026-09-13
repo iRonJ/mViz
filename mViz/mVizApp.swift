@@ -7,7 +7,7 @@ struct mVizApp: App {
   @State private var model = VisualizerModel()
 
   var body: some Scene {
-    WindowGroup {
+    WindowGroup(id: "main") {
       ContentView(model: model)
         .task {
           #if DEBUG

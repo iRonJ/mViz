@@ -4,6 +4,7 @@ struct ContentView: View {
   @Bindable var model: VisualizerModel
   @Environment(\.openImmersiveSpace) private var openSpace
   @Environment(\.dismissImmersiveSpace) private var dismissSpace
+  @Environment(\.dismissWindow) private var dismissWindow
   @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
@@ -41,7 +42,9 @@ struct ContentView: View {
               await dismissSpace()
             } else {
               switch await openSpace(id: "ImmersiveSpace") {
-              case .opened: model.isImmersed = true
+              case .opened:
+                model.isImmersed = true
+                dismissWindow(id: "main")
               case .userCancelled: break
               case .error: model.status = "Couldn’t open the immersive space. Please try again."
               @unknown default: break
@@ -59,6 +62,11 @@ struct ContentView: View {
         .font(.caption).foregroundStyle(.secondary)
       }
       .padding(32)
+    }
+    .onChange(of: model.isImmersed) { _, isImmersed in
+      if isImmersed {
+        dismissWindow(id: "main")
+      }
     }
     .onChange(of: scenePhase) { _, phase in
       if phase == .background && !model.isImmersed { model.stop() }

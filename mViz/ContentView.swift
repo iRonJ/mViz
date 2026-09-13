@@ -1,78 +1,75 @@
-//
-//  ContentView.swift
-//  mViz
-//
-//  Created by Ron Jailall on 3/8/24.
-//
-
 import SwiftUI
-import RealityKit
-import RealityKitContent
 
 struct ContentView: View {
+  @Bindable var model: VisualizerModel
+  @Environment(\.openImmersiveSpace) private var openSpace
+  @Environment(\.dismissImmersiveSpace) private var dismissSpace
+  @Environment(\.dismissWindow) private var dismissWindow
+  @Environment(\.scenePhase) private var scenePhase
 
-    @State private var enlarge = false
-    @State private var showImmersiveSpace = false
-    @State private var immersiveSpaceIsShown = false
-
-    @Environment(\.openImmersiveSpace) var openImmersiveSpace
-    @Environment(\.dismissImmersiveSpace) var dismissImmersiveSpace
-
-    var body: some View {
-        VStack {
-            RealityView { content in
-                // Add the initial RealityKit content
-                if let scene = try? await Entity(named: "Scene", in: realityKitContentBundle) {
-                    content.add(scene)
-                }
-
-            } update: { content in
-                // Update the RealityKit content when SwiftUI state changes
-                if let scene = content.entities.first {
-                    let uniformScale: Float = enlarge ? 10.4 : 1.0
-                    scene.transform.scale = [uniformScale, uniformScale, uniformScale]
-                    
-                    }
-            }
-                    .gesture(TapGesture().targetedToAnyEntity().onEnded { _ in
-                enlarge.toggle()
-            })
-
-            VStack (spacing: 12) {
-                Toggle("Enlarge RealityView Content", isOn: $enlarge)
-                    .font(.title)
-                    .bold()
-
-                Toggle("Show ImmersiveSpace", isOn: $showImmersiveSpace)
-                    .font(.title)
-            }
-            .frame(width: 360)
-            .padding(36)
-            .glassBackgroundEffect()
-
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 24) {
+        Label("mViz", systemImage: "waveform.path")
+          .font(.largeTitle.bold())
+        Text("Step inside your music.")
+          .font(.title2)
+        Text(
+          "An orbiting nebula of light. Bass drives the pulse, mids shape the motion, and highs scatter the stars."
+        )
+        .foregroundStyle(.secondary)
+        VUMeterView(model: model)
+        Button(
+          model.listening ? "Stop microphone" : "Start microphone",
+          systemImage: model.listening ? "mic.fill" : "mic"
+        ) {
+          if model.listening { model.stopListening() } else { Task { await model.start() } }
         }
-        .onChange(of: showImmersiveSpace) { _, newValue in
-            Task {
-                if newValue {
-                    switch await openImmersiveSpace(id: "ImmersiveSpace") {
-                    case .opened:
-                        immersiveSpaceIsShown = true
-                    case .error, .userCancelled:
-                        fallthrough
-                    @unknown default:
-                        immersiveSpaceIsShown = false
-                        showImmersiveSpace = false
-                    }
-                } else if immersiveSpaceIsShown {
-                    await dismissImmersiveSpace()
-                    immersiveSpaceIsShown = false
-                }
-            }
+        Text(model.status).font(.callout).foregroundStyle(.secondary)
+        VisualizerControls(model: model)
+        VStack(alignment: .leading) {
+          Text("Sensitivity")
+          Slider(value: $model.sensitivity, in: 0.5...10)
+          Text("Particle intensity")
+          Slider(value: $model.intensity, in: 0.2...1)
         }
+        Button(model.isImmersed ? "Leave visualizer" : "Enter visualizer", systemImage: "sparkles")
+        {
+          Task { @MainActor in
+            model.transitioning = true
+            defer { model.transitioning = false }
+            if model.isImmersed {
+              await dismissSpace()
+            } else {
+              switch await openSpace(id: "ImmersiveSpace") {
+              case .opened:
+                model.isImmersed = true
+                dismissWindow(id: "main")
+              case .userCancelled: break
+              case .error: model.status = "Couldn’t open the immersive space. Please try again."
+              @unknown default: break
+              }
+            }
+          }
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(model.transitioning)
+        Divider()
+        PlaylistView(model: model, player: model.library)
+        Text(
+          "Microphone mode hears your surroundings. Play music on nearby speakers. Audio stays on this device."
+        )
+        .font(.caption).foregroundStyle(.secondary)
+      }
+      .padding(32)
     }
-
-}
-
-#Preview(windowStyle: .volumetric) {
-    ContentView()
+    .onChange(of: model.isImmersed) { _, isImmersed in
+      if isImmersed {
+        dismissWindow(id: "main")
+      }
+    }
+    .onChange(of: scenePhase) { _, phase in
+      if phase == .background && !model.isImmersed { model.stop() }
+    }
+  }
 }

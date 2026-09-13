@@ -2,14 +2,33 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>mViz browses and plays your music library and lets you import unprotected device songs with their star ratings.</string>
+	<key>NSWorldSensingUsageDescription</key>
+	<string>mViz detects room surfaces so glowing particles can bounce off your walls, floor, and furniture.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>mViz uses the microphone to animate immersive particles to the music around you. Audio is never saved.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationPreferredDefaultSceneSessionRole</key>
-		<string>UIWindowSceneSessionRoleVolumetricApplication</string>
+		<string>UIWindowSceneSessionRoleApplication</string>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<true/>
 		<key>UISceneConfigurations</key>
 		<dict/>
 	</dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>TechronicApps.mViz</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>mviz</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

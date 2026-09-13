@@ -96,18 +96,29 @@ extension ParticleField {
     return try? TextureResource(image: cgImage, options: .init(semantic: .color))
   }
 
-  func applyStyle(_ style: ParticleStyle, to particles: inout ParticleEmitterComponent) {
+  static let evolvingForms: [EmitterForm] = [.sphere, .torus, .plane, .cone, .box]
+  static let evolvingStyles: [ParticleStyle] = [.glow, .sparks, .rings, .flakes]
+
+  func styleFor(slot: Int, nodeIndex: Int, shapeTime: Float, selectedStyle: ParticleStyle) -> ParticleStyle {
+    guard selectedStyle == .evolving else { return selectedStyle }
+    let cycle = Int(shapeTime / 10)
+    let styleIndex = (cycle + slot + nodeIndex) % Self.evolvingStyles.count
+    return Self.evolvingStyles[styleIndex]
+  }
+
+  func applyStyle(_ style: ParticleStyle, to particles: inout ParticleEmitterComponent, slot: Int = 1) {
     if let tex = textures[style] {
       particles.mainEmitter.image = tex
     }
-    particles.mainEmitter.stretchFactor = style == .sparks ? 4 : 1
+    particles.mainEmitter.stretchFactor = style == .sparks ? 3.5 : 1
     particles.mainEmitter.opacityCurve = style == .sparks ? .linearFadeOut : .gradualFadeInOut
-    particles.mainEmitter.sizeMultiplierAtEndOfLifespan = style == .rings ? 2.8 : 0.25
-    particles.mainEmitter.angularSpeed = style == .flakes ? 0.8 : 0
-    particles.mainEmitter.angularSpeedVariation = style == .flakes ? 1 : 0
-    particles.mainEmitter.noiseStrength = style == .flakes ? 0.2 : 0.03
+    particles.mainEmitter.sizeMultiplierAtEndOfLifespan = style == .rings ? 2.6 : 0.25
+    let baseAngularSpeed: Float = slot == 0 ? 0.35 : (slot == 1 ? 0.85 : 1.9)
+    particles.mainEmitter.angularSpeed = style == .flakes ? baseAngularSpeed * 1.4 : baseAngularSpeed
+    particles.mainEmitter.angularSpeedVariation = particles.mainEmitter.angularSpeed * 0.75
+    particles.mainEmitter.noiseStrength = style == .flakes ? 0.18 : 0.03
     particles.mainEmitter.noiseScale = 0.5
-    if style == .rings || style == .flakes { particles.mainEmitter.size *= 2.4 }
-    if style == .sparks { particles.mainEmitter.lifeSpan = 1.2 }
+    if style == .rings || style == .flakes { particles.mainEmitter.size *= 2.2 }
+    if style == .sparks { particles.mainEmitter.lifeSpan *= 0.8 }
   }
 }

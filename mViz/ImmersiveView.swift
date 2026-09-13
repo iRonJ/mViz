@@ -12,16 +12,29 @@ struct ImmersiveView: View {
   @State private var autohideTask: Task<Void, Never>? = nil
   @State private var field: ParticleField?
   @State private var updateSubscription: EventSubscription?
+  @State private var tapTarget = Entity()
 
   private func resetAutohideTimer() {
     autohideTask?.cancel()
-    let delayNanoseconds: UInt64 = showSettings ? 10_000_000_000 : 5_000_000_000
+    guard !showSettings else { return }
     autohideTask = Task { @MainActor in
-      try? await Task.sleep(nanoseconds: delayNanoseconds)
+      try? await Task.sleep(nanoseconds: 5_000_000_000)
       guard !Task.isCancelled else { return }
       withAnimation(.easeInOut(duration: 0.4)) {
         controlsVisible = false
       }
+    }
+  }
+
+  private func updateTapTarget() {
+    let active = !controlsVisible
+    tapTarget.isEnabled = active
+    if active {
+      tapTarget.components.set(InputTargetComponent())
+      tapTarget.components.set(CollisionComponent(shapes: [.generateSphere(radius: 20)], mode: .trigger))
+    } else {
+      tapTarget.components.remove(InputTargetComponent.self)
+      tapTarget.components.remove(CollisionComponent.self)
     }
   }
 
@@ -32,11 +45,8 @@ struct ImmersiveView: View {
       content.add(visualizerField.root)
       content.add(visualizerField.stageRoot)
 
-      // Invisible spherical trigger target so clicking or pinching anywhere in space toggles controls
-      let tapTarget = Entity()
       tapTarget.name = "GestureTapTarget"
-      tapTarget.components.set(InputTargetComponent())
-      tapTarget.components.set(CollisionComponent(shapes: [.generateSphere(radius: 20)], mode: .trigger))
+      updateTapTarget()
       content.add(tapTarget)
 
       if let controls = attachments.entity(for: "controls") {
@@ -46,6 +56,8 @@ struct ImmersiveView: View {
       updateSubscription = content.subscribe(to: SceneEvents.Update.self) { event in
         visualizerField.update(dt: Float(event.deltaTime), model: model)
       }
+    } update: { _, _ in
+      updateTapTarget()
     } attachments: {
       Attachment(id: "controls") {
         VStack(spacing: 14) {
@@ -111,7 +123,6 @@ struct ImmersiveView: View {
           HStack(spacing: 12) {
             Button(showSettings ? "Hide settings" : "Settings", systemImage: "slider.horizontal.3")
             {
-              resetAutohideTimer()
               withAnimation(.easeInOut(duration: 0.25)) {
                 showSettings.toggle()
               }
@@ -146,30 +157,37 @@ struct ImmersiveView: View {
         .opacity(controlsVisible ? 1 : 0)
         .animation(.easeInOut(duration: 0.35), value: controlsVisible)
         .allowsHitTesting(controlsVisible)
-        .onTapGesture {
-          resetAutohideTimer()
-        }
       }
     }
     .gesture(
       SpatialTapGesture()
-        .targetedToEntity(where: .has(InputTargetComponent.self))
-        .onEnded { event in
-          if event.entity.name == "GestureTapTarget" {
-            withAnimation(.easeInOut(duration: 0.35)) {
-              controlsVisible.toggle()
-            }
-            if controlsVisible {
-              resetAutohideTimer()
-            } else {
-              autohideTask?.cancel()
-            }
+        .targetedToEntity(tapTarget)
+        .onEnded { _ in
+          withAnimation(.easeInOut(duration: 0.35)) {
+            controlsVisible = true
           }
+          resetAutohideTimer()
         }
     )
     .onAppear {
       model.isImmersed = true
+      updateTapTarget()
       resetAutohideTimer()
+    }
+    .onChange(of: controlsVisible) { _, visible in
+      updateTapTarget()
+      if visible {
+        resetAutohideTimer()
+      } else {
+        autohideTask?.cancel()
+      }
+    }
+    .onChange(of: showSettings) { _, open in
+      if open {
+        autohideTask?.cancel()
+      } else {
+        resetAutohideTimer()
+      }
     }
     .task(id: model.needsRoomGeometry, priority: .low) {
       let activeField = field ?? ParticleField()

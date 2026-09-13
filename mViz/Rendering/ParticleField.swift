@@ -526,12 +526,27 @@ final class ParticleField {
         let birthRate = ParticleBudget.birthRate(
           requested: requestedBirthRate, lifeSpan: particles.mainEmitter.lifeSpan)
 
+        // Cluster layout: 3 emitters form a tight, delicate constellation (~3.2cm - 5.4cm radius)
+        let clusterAngle = Float(slot) * 2 * .pi / 3.0 + time * 0.35 + Float(index) * 0.25
+        let clusterRadius: Float = (0.032 + bassPunch * 0.022) * shapeScale
+        let clusterOffset = SIMD3<Float>(
+          cos(clusterAngle) * clusterRadius,
+          sin(clusterAngle) * clusterRadius,
+          0
+        )
+
         if orbitEmittersActive {
+          orbitChild.position = clusterOffset
           particles.mainEmitter.birthRate = birthRate * (1 - frontWeight)
           orbitChild.components.set(particles)
         }
 
         if stageEmittersActive {
+          stageChild.position = SIMD3<Float>(
+            cos(clusterAngle) * clusterRadius * 0.7,
+            0,
+            sin(clusterAngle) * clusterRadius * 0.7
+          )
           particles.mainEmitter.birthRate = birthRate * stageWeight
           particles.birthDirection = .local
           let side: Float = stage.position.x < 0 ? -1 : 1

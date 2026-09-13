@@ -13,13 +13,59 @@ https://github.com/user-attachments/assets/demo
 
 ---
 
-## Run on Vision Pro
+## Quick Start & Setup
 
-1. Open `mViz.xcodeproj` in Xcode.
-2. Select the `mViz` scheme and your paired **Apple Vision Pro** hardware (or visionOS Simulator).
-3. Build & Run (`Cmd + R`).
+### Prerequisites
 
-Choose **Enter visualizer** on the main window. **Show surroundings** toggles live between passthrough and full immersion. The floating **Settings** ornament panel exposes movement modes, particle forms, speed, intensity, sensitivity, and room interaction. Tap **Leave** or use system immersion controls to exit.
+- **macOS:** macOS Sequoia 15.0 or later
+- **Xcode:** Xcode 16.0 or later
+- **SDK:** visionOS 2.0+ SDK (included with Xcode 16)
+- **Target Platform:** Apple Vision Pro (visionOS 2.0+) or visionOS Simulator
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/iRonJ/mViz.git
+cd mViz
+```
+
+### 2. Open in Xcode
+
+```bash
+open mViz.xcodeproj
+```
+
+### 3. Configure Code Signing
+
+- **For visionOS Simulator:** No Apple Developer account or signing certificate is required! Select `mViz` scheme -> Choose any visionOS Simulator target -> Press `Cmd + R` to run immediately.
+- **For Apple Vision Pro (Hardware):**
+  1. In the Xcode Project Navigator, select `mViz` at the root.
+  2. Select the `mViz` target and navigate to **Signing & Capabilities**.
+  3. Under **Signing**, check **Automatically manage signing**.
+  4. Select your **Team** (your personal Apple ID team or developer team).
+  5. If necessary, adjust the **Bundle Identifier** to your own unique prefix (e.g., `com.yourname.mViz`).
+
+### 4. Build from Command Line (Optional)
+
+You can build the project for the visionOS Simulator directly from your terminal without signing:
+
+```bash
+# Build for visionOS Simulator
+xcodebuild -project mViz.xcodeproj \
+  -scheme mViz \
+  -destination 'generic/platform=visionOS Simulator' \
+  CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+  build
+```
+
+### 5. Running the Visualizer
+
+1. Launch the app on your Apple Vision Pro or Simulator.
+2. Tap **Enter visualizer** on the main window.
+3. Use **Show surroundings** to toggle live between passthrough and full immersion.
+4. The floating **Settings** ornament panel allows you to customize movement modes, particle styles, shapes, speed, intensity, sensitivity, and room interaction.
+5. All user settings are automatically saved and restored on your next session.
+6. Tap **Leave** or use the system digital crown to exit back to the main window.
 
 ---
 
@@ -28,7 +74,7 @@ Choose **Enter visualizer** on the main window. **Show surroundings** toggles li
 mViz features twelve distinct movement kinematics spanning a full 360° celestial sphere around the listener:
 
 - **Cosmic fog:** A volumetric 3D particle mist cloud that envelops the listener in a living, breathing nebula of harmonic laminar flow, gentle tidal drift, wide particle spread, and subtle breathing luminescence.
-- **Supernova:** A relativistic pulsar featuring energetic polar plasma jets erupting straight toward the ceiling ( pprox 3.5	ext{m}$) and floor ( pprox 0.3	ext{m}$), encircled by a high-velocity equatorial accretion disk with relativistic streak elongation and transient beat strobes.
+- **Supernova:** A relativistic pulsar featuring energetic polar plasma jets erupting straight toward the ceiling ($\approx 3.5\text{m}$) and floor ($\approx 0.3\text{m}$), encircled by a high-velocity equatorial accretion disk with relativistic streak elongation and transient beat strobes.
 - **Flurry spectrum:** Ten stationary spectrum columns five meters in front of the viewer, ordered from 31 Hz to 16 kHz to match the 10-band GEQ. Colored, wispy light trails curl upward from each column's audio-reactive tip, inspired by the classic macOS Flurry screensaver. Tap **Recenter** to reposition in front of your head orientation.
 - **Nebula:** An orbiting spherical constellation of color with 3D inclined orbital planes that sweep directly above the user (zenith) and beneath the user (nadir) with oscillating rotational direction.
 - **Double helix:** Braided vertical double-helix strands that spiral upward from directly below your feet, expand outward around you at eye level, and twist together directly above your head.
@@ -41,7 +87,7 @@ mViz features twelve distinct movement kinematics spanning a full 360° celestia
 - **Room bounce:** A pool of up to 96 audio-reactive physics particles colliding with detected room surfaces, launched from emitters traversing ceiling to floor. Colors dynamically shift across the spectrum based on real-time audio frequency balance. Enabled by default; requires World Sensing permission. If surfaces are unavailable, ambient particles continue and the panel explains the state.
 
 > **Spherical 360° Clearance:** All 360° modes maintain a 1.35m spherical clearance around the user at eye level:
-> 66623	ext{minRadius} = \sqrt{\max(0, 1.35^2 - (y - 1.5)^2)}66623
+> $$\text{minRadius} = \sqrt{\max(0, 1.35^2 - (y - 1.5)^2)}$$
 > Emitters freely pass directly overhead (zenith) and underfoot (nadir) without ever clipping into your personal eye space.
 
 ---
@@ -59,7 +105,7 @@ mViz features twelve distinct movement kinematics spanning a full 360° celestia
 
 - **Particle Styles:** Choose between **Glow** (soft radial bloom), **Sparks** (sharp directional bursts with fast decay), **Halo rings** (expanding rings), **Snowflakes** (intricate 6-point crystals with rotational noise), or **Evolving** (cycles automatically through styles every 12 seconds).
 - **Emitter Shapes:** Choose between **Spheres**, **Rings** (torus), **Ribbons** (plane), **Cones**, **Cubes** (box), or **Evolving** (cycles through shapes every 8 seconds, contracting the emission surface before smoothly morphing).
-- **Motion Speed:** Default `2.6×`. Adjustable slider spanning `0.25×` to `3.00×` controlling angular velocity, emitter displacement, and particle flight dynamics.
+- **Motion Speed:** Default `1.0×`. Adjustable slider spanning `0.25×` to `3.00×` controlling angular velocity, emitter displacement, and particle flight dynamics.
 
 ---
 
@@ -73,7 +119,7 @@ mViz features twelve distinct movement kinematics spanning a full 360° celestia
   - Lighting intensities smoothly fade in and fade out according to continuous motion blend weights.
 - **Surface & Celestial Illumination:** Synchronized flashes illuminate detected room surface meshes (in passthrough) or the surrounding celestial sphere (in full immersion) on bass beats.
 - **Photosensitivity Safety:** Flashes are strictly rate-limited to a maximum of 2 Hz ($\ge 0.5\text{s}$ refractory cooldown). When system **Reduce Motion** is active, strobe automatically downgrades to a gentle pulse.
-- **Audio Sync Delay:** Slider ranging from `0.00s` to `0.60s` (default `0.25s`) compensates for audio-to-visual rendering pipeline latency.
+- **Audio Sync Delay:** Slider ranging from `0.00s` to `0.60s` (default `0.00s`) compensates for audio-to-visual rendering pipeline latency.
 
 ---
 
@@ -89,9 +135,13 @@ mViz features twelve distinct movement kinematics spanning a full 360° celestia
 ## Performance Architecture
 
 - **VSYNC-Driven 90 FPS Render Loop:** Subscribes natively to RealityKit `SceneEvents.Update`, rendering at native headset refresh rate without timer stalls.
+- **Unified 12-Node Kinematics Pipeline:** All 12 motion modes share a single pre-allocated 12-node pipeline, ensuring instant, zero-hitch transitions between 360° celestial modes and front-facing stage modes (Mirror Line and Mirror Plane) at 90 FPS.
+- **Frequency-Specialized Emitter Triads:** Each visualizer node orchestrates a tight triad cluster of three sub-emitters, each attuned to a different frequency span (low body, mid punch, high shimmer) and distinct particle shapes for rich dynamic reactivity across any musical genre.
+- **Rhythm Bop Dynamics:** Real-time rhythmic transient and envelope tracking maintains energetic visual "bop" even through steady musical grooves, eliminating particle starvation.
 - **Lock-Free Band Storage:** Uses `os_unfair_lock` in `AudioBandStorage` for thread-safe cross-thread transfer between CoreAudio realtime threads and RealityKit frames.
 - **Material Caching:** Room physics particles share pre-allocated `UnlitMaterial` buckets updated only on spectral shifts, eliminating per-frame allocations.
 - **Pure SwiftUI Views:** Decoupled audio envelope reads from SwiftUI body evaluations, eliminating layout invalidation loops and launch hangs.
+- **Automatic Settings Persistence:** All user preferences (modes, particle styles, shapes, speeds, sensitivities, delays, lighting) are automatically preserved across launches via `UserDefaults`.
 
 ---
 
@@ -138,3 +188,9 @@ Particle size is adjustable from 25–200%, with a 70% default. Fog/Supernova de
 See [the reactivity review](Docs/AudioReactivityReview.md) and [private audio results](Docs/PrivateAudioInvestigation.md): ordinary recording succeeds, but the private processing queue returns a permissions error on the tested headset. Cloud beat/loudness metadata remains blocked at developer-token acquisition.
 
 **Logarithmic audio response** is enabled by default in Settings. It applies a normalized `log1p(9x)` curve to sensitivity-adjusted visual levels, lifting quieter details with a small near-silence floor. Particle dynamics and GEQ meters share the mapping; beat detection retains the linear amplitude envelope. Turn the toggle off for the previous linear response.
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

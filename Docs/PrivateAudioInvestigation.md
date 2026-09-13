@@ -96,6 +96,6 @@ SDK root:
 `/Applications/Xcode.app/Contents/Developer/Platforms/XROS.platform/Developer/SDKs/XROS.sdk`
 
 Cached runtime root:
-`/Users/ronj/Library/Developer/Xcode/visionOS DeviceSupport/RealityDevice14,1 27.0 (24M5355a)/Symbols/System/Library`
+`~/Library/Developer/Xcode/visionOS DeviceSupport/RealityDevice14,1 27.0 (24M5355a)/Symbols/System/Library`
 
 Static tools used: read-only `rg`, `nm`, `strings`, `otool -tvV`, and `xcrun swift-demangle`. The real-device diagnostic additionally loaded frameworks and queried runtime class/method metadata. No private tap initializer or capture method was invoked. No recording, DRM decryption, code injection, entitlement changes, or messages to Apple were performed by this investigation.

@@ -44,25 +44,62 @@ final class AudioBandStorage: @unchecked Sendable {
 
 @MainActor @Observable
 final class VisualizerModel {
+  private enum SettingsKeys {
+    static let audioDelay = "mViz.audioDelay"
+    static let motionSpeed = "mViz.motionSpeed"
+    static let motion = "mViz.motion"
+    static let automaticModes = "mViz.automaticModes"
+    static let roomEnabled = "mViz.roomEnabled"
+    static let shape = "mViz.shape"
+    static let particleStyle = "mViz.particleStyle"
+    static let particleSize = "mViz.particleSize"
+    static let intensity = "mViz.intensity"
+    static let sensitivity = "mViz.sensitivity"
+    static let beatLighting = "mViz.beatLighting"
+    static let lightingIntensity = "mViz.lightingIntensity"
+    static let passthrough = "mViz.passthrough"
+    static let logarithmicLevels = "mViz.logarithmicLevels"
+    static let transientDynamics = "mViz.transientDynamics"
+  }
+
   var library = LocalMusicPlayer()
   var immersionStyle: ImmersionStyle = .mixed
   var passthrough: Bool {
     get { immersionStyle is MixedImmersionStyle }
-    set { immersionStyle = newValue ? .mixed : .full }
+    set {
+      immersionStyle = newValue ? .mixed : .full
+      UserDefaults.standard.set(newValue, forKey: SettingsKeys.passthrough)
+    }
   }
-  var motion: MotionMode = .orbit
-  var automaticModes = true
-  var roomEnabled = true
-  var beatLighting: BeatLightingStyle = .evolving
-  var lightingIntensity: Float = 0.15
+  var motion: MotionMode = .orbit {
+    didSet { UserDefaults.standard.set(motion.rawValue, forKey: SettingsKeys.motion) }
+  }
+  var automaticModes = true {
+    didSet { UserDefaults.standard.set(automaticModes, forKey: SettingsKeys.automaticModes) }
+  }
+  var roomEnabled = true {
+    didSet { UserDefaults.standard.set(roomEnabled, forKey: SettingsKeys.roomEnabled) }
+  }
+  var beatLighting: BeatLightingStyle = .evolving {
+    didSet { UserDefaults.standard.set(beatLighting.rawValue, forKey: SettingsKeys.beatLighting) }
+  }
+  var lightingIntensity: Float = 0.15 {
+    didSet { UserDefaults.standard.set(lightingIntensity, forKey: SettingsKeys.lightingIntensity) }
+  }
   var reduceMotion = false
   var needsRoomGeometry: Bool { roomEnabled || (beatLighting != .off && passthrough) }
   var roomReady = false
   var roomStatus = "Room bounce enabled • detecting nearby surfaces."
-  var shape: EmitterForm = .evolving
-  var particleStyle: ParticleStyle = .evolving
+  var shape: EmitterForm = .evolving {
+    didSet { UserDefaults.standard.set(shape.rawValue, forKey: SettingsKeys.shape) }
+  }
+  var particleStyle: ParticleStyle = .evolving {
+    didSet { UserDefaults.standard.set(particleStyle.rawValue, forKey: SettingsKeys.particleStyle) }
+  }
   var recenterStage = 0
-  var motionSpeed: Float = 2.6
+  var motionSpeed: Float = 1.0 {
+    didSet { UserDefaults.standard.set(motionSpeed, forKey: SettingsKeys.motionSpeed) }
+  }
   var activeMotion: MotionMode = .orbit
   let bandStorage = AudioBandStorage()
   var bands: SIMD3<Float> {
@@ -73,16 +110,27 @@ final class VisualizerModel {
     get { bandStorage.bands10 }
     set { bandStorage.bands10 = newValue }
   }
-  var audioDelay: Double = 0.25 {
+  var audioDelay: Double = 0.0 {
     didSet {
       library.setAudioDelay(audioDelay)
+      UserDefaults.standard.set(audioDelay, forKey: SettingsKeys.audioDelay)
     }
   }
-  var sensitivity: Float = 3
-  var logarithmicLevels = true
-  var transientDynamics = true
-  var intensity: Float = 0.7
-  var particleSize: Float = 0.7
+  var sensitivity: Float = 3 {
+    didSet { UserDefaults.standard.set(sensitivity, forKey: SettingsKeys.sensitivity) }
+  }
+  var logarithmicLevels = true {
+    didSet { UserDefaults.standard.set(logarithmicLevels, forKey: SettingsKeys.logarithmicLevels) }
+  }
+  var transientDynamics = true {
+    didSet { UserDefaults.standard.set(transientDynamics, forKey: SettingsKeys.transientDynamics) }
+  }
+  var intensity: Float = 0.7 {
+    didSet { UserDefaults.standard.set(intensity, forKey: SettingsKeys.intensity) }
+  }
+  var particleSize: Float = 0.7 {
+    didSet { UserDefaults.standard.set(particleSize, forKey: SettingsKeys.particleSize) }
+  }
   var demo = false
   var isImmersed = false
   var transitioning = false
@@ -98,7 +146,62 @@ final class VisualizerModel {
   private var generation = 0
   private var observers: [NSObjectProtocol] = []
 
+  private func loadSavedSettings() {
+    let defaults = UserDefaults.standard
+    if let delay = defaults.object(forKey: SettingsKeys.audioDelay) as? Double {
+      audioDelay = max(0, min(2, delay))
+    }
+    if let speed = defaults.object(forKey: SettingsKeys.motionSpeed) as? Float {
+      motionSpeed = max(0.25, min(3.0, speed))
+    }
+    if let motionRaw = defaults.string(forKey: SettingsKeys.motion),
+      let savedMotion = MotionMode(rawValue: motionRaw) {
+      motion = savedMotion
+    }
+    if let autoModes = defaults.object(forKey: SettingsKeys.automaticModes) as? Bool {
+      automaticModes = autoModes
+    }
+    if let room = defaults.object(forKey: SettingsKeys.roomEnabled) as? Bool {
+      roomEnabled = room
+    }
+    if let shapeRaw = defaults.string(forKey: SettingsKeys.shape),
+      let savedShape = EmitterForm(rawValue: shapeRaw) {
+      shape = savedShape
+    }
+    if let styleRaw = defaults.string(forKey: SettingsKeys.particleStyle),
+      let savedStyle = ParticleStyle(rawValue: styleRaw) {
+      particleStyle = savedStyle
+    }
+    if let size = defaults.object(forKey: SettingsKeys.particleSize) as? Float {
+      particleSize = max(0.25, min(2.0, size))
+    }
+    if let intens = defaults.object(forKey: SettingsKeys.intensity) as? Float {
+      intensity = max(0.2, min(1.0, intens))
+    }
+    if let sens = defaults.object(forKey: SettingsKeys.sensitivity) as? Float {
+      sensitivity = max(0.5, min(10.0, sens))
+    }
+    if let lightRaw = defaults.string(forKey: SettingsKeys.beatLighting),
+      let savedLight = BeatLightingStyle(rawValue: lightRaw) {
+      beatLighting = savedLight
+    }
+    if let lightIntens = defaults.object(forKey: SettingsKeys.lightingIntensity) as? Float {
+      lightingIntensity = max(0.03, min(0.3, lightIntens))
+    }
+    if let isPassthrough = defaults.object(forKey: SettingsKeys.passthrough) as? Bool {
+      immersionStyle = isPassthrough ? .mixed : .full
+    }
+    if let logLevels = defaults.object(forKey: SettingsKeys.logarithmicLevels) as? Bool {
+      logarithmicLevels = logLevels
+    }
+    if let transDynamics = defaults.object(forKey: SettingsKeys.transientDynamics) as? Bool {
+      transientDynamics = transDynamics
+    }
+  }
+
   init() {
+    loadSavedSettings()
+    library.setAudioDelay(audioDelay)
     for name in [
       AVAudioSession.interruptionNotification, AVAudioSession.routeChangeNotification,
       AVAudioSession.mediaServicesWereResetNotification,

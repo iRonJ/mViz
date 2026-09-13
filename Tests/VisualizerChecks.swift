@@ -280,4 +280,45 @@ for mode in MotionMode.allCases {
 }
 print("PASS: low base emitter rate/speed and wide dynamic range across all visualization modes")
 
+// RhythmBopTracker verification
+var bopTracker = RhythmBopTracker<SIMD3<Float>>()
+precondition(bopTracker.fast == .zero && bopTracker.slow == .zero && bopTracker.bop == .zero)
+
+// Steady continuous loud signal: fast and slow converge, bop relaxes
+for _ in 0..<40 {
+    bopTracker.update(signal: SIMD3<Float>(0.75, 0.70, 0.65), dt: 0.016)
+}
+precondition(bopTracker.slow.x > 0.4, "Slow tracker failed to follow steady level")
+precondition(bopTracker.bop.x < 0.15, "Bop failed to settle under sustained signal")
+
+// Drum beat attack on top of sustained music
+bopTracker.update(signal: SIMD3<Float>(0.98, 0.95, 0.90), dt: 0.016)
+precondition(bopTracker.bop.x > 0.45, "Bop did not fire on kick during sustained music")
+precondition(bopTracker.bop.y > 0.40, "Bop did not fire on snare during sustained music")
+let peakBop = bopTracker.bop.x
+
+// Musical decay of the bop
+for _ in 0..<12 {
+    bopTracker.update(signal: SIMD3<Float>(0.75, 0.70, 0.65), dt: 0.016)
+}
+precondition(bopTracker.bop.x < peakBop * 0.55, "Bop did not decay musically after transient")
+print("PASS: RhythmBopTracker transient extraction, steady-state rejection, and musical decay")
+
+// Unified node stage positioning and transition continuity
+var stageBlend = MotionBlend()
+var sTime: Float = 0
+for _ in 0..<60 {
+    stageBlend.advance(toward: .line, dt: 1 / 60)
+    sTime += 1 / 60
+}
+precondition(stageBlend[.line] > 0.5, "Stage line did not advance")
+for i in 0..<12 {
+    let p = stageBlend.position(index: i, phase: Float(i) / 12 * 2 * .pi, time: sTime, bass: 0.5)
+    precondition(p.x.isFinite && p.y.isFinite && p.z.isFinite)
+    let radius = sqrt(p.x * p.x + p.z * p.z)
+    precondition(radius <= 4.1)
+}
+print("PASS: unified node stage positioning and smooth transition continuity")
+
+
 

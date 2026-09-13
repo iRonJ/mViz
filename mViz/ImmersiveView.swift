@@ -43,7 +43,6 @@ struct ImmersiveView: View {
       let visualizerField = field ?? ParticleField()
       if field == nil { field = visualizerField }
       content.add(visualizerField.root)
-      content.add(visualizerField.stageRoot)
 
       tapTarget.name = "GestureTapTarget"
       updateTapTarget()

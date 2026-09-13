@@ -52,6 +52,29 @@ struct MotionBlend {
     return [cos(angle) * safeRadius, safeY, sin(angle) * safeRadius]
   }
 
+  func position(index: Int, phase: Float, time: Float, bass: Float) -> SIMD3<Float> {
+    let orbitPos = position(phase: phase, time: time, bass: bass)
+    let lineWeight = weights[MotionMode.line.index]
+    let gridWeight = weights[MotionMode.grid.index]
+    let stageWeight = lineWeight + gridWeight
+    guard stageWeight > 0.001 else { return orbitPos }
+
+    let allModes = MotionMode.allCases
+    var stagePos = SIMD3<Float>.zero
+    if lineWeight > 0.001, let lineMode = allModes[MotionMode.line.index].definition as? StagePositionable {
+      stagePos += lineMode.stagePosition(index: index, time: time, bass: bass) * lineWeight
+    }
+    if gridWeight > 0.001, let gridMode = allModes[MotionMode.grid.index].definition as? StagePositionable {
+      stagePos += gridMode.stagePosition(index: index, time: time, bass: bass) * gridWeight
+    }
+    stagePos /= stageWeight
+
+    if stageWeight >= 0.999 {
+      return stagePos
+    }
+    return orbitPos * (1 - stageWeight) + stagePos * stageWeight
+  }
+
   func dynamics(bass: Float) -> BlendedDynamics {
     var result = BlendedDynamics()
     let allModes = MotionMode.allCases

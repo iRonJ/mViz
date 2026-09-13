@@ -317,8 +317,21 @@ for i in 0..<12 {
     precondition(p.x.isFinite && p.y.isFinite && p.z.isFinite)
     let radius = sqrt(p.x * p.x + p.z * p.z)
     precondition(radius <= 4.1)
+    precondition(p.y >= 1.0 && p.y <= 2.0, "Stage line node \(i) not at eye level: y=\(p.y)")
 }
-print("PASS: unified node stage positioning and smooth transition continuity")
+print("PASS: unified node stage positioning, eye-level elevation, and smooth transition continuity")
 
-
-
+// Long-running continuous rhythm test: verify zero cyclic dropouts over 10 seconds of playback
+var longTracker = RhythmBopTracker<SIMD3<Float>>()
+var minBopOnBeats: Float = 1.0
+for step in 0..<600 {
+    let t = Float(step) * 0.016
+    let isBeat = t.truncatingRemainder(dividingBy: 0.5) < 0.05
+    let sig: Float = isBeat ? 0.70 : 0.25
+    longTracker.update(signal: SIMD3<Float>(repeating: sig), dt: 0.016)
+    if isBeat && step > 30 {
+        minBopOnBeats = min(minBopOnBeats, longTracker.bop.x)
+    }
+}
+precondition(minBopOnBeats > 0.40, "Long running tracker suffered cyclic dropout: min bop = \(minBopOnBeats)")
+print("PASS: 10-second continuous music playback maintains consistent rhythm bop without cyclic dropouts")

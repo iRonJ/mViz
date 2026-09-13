@@ -3,7 +3,7 @@ import Foundation
 /// A stationary distant equalizer with flowing, Flurry-inspired light trails.
 struct FlurrySpectrumMode: MotionPattern {
   static let bandCount = 10
-  static let baseline: Float = -0.9
+  static let baseline: Float = 0.6
 
   func pose(phase: Float, time: Float) -> SIMD3<Float> { [3, 1.5, 0] }
 

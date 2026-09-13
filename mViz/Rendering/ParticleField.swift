@@ -342,7 +342,7 @@ final class ParticleField {
         particles.mainEmitter.acceleration.y += blendedDynamics.gravity
 
         // 1. Guaranteed active simmer during music + rhythmic burst dynamics
-        let slotFloor = (1.5 + activity * 9.0) / 3.0
+        let slotFloor = (3.5 + activity * 12.0) / 3.0
         let roomReduction = 1 - blend[.room] * (surfacesAvailable ? 0.85 : 0)
         let requestedBirthRate: Float
 
@@ -356,63 +356,63 @@ final class ParticleField {
 
         switch slot {
         case 0:  // Bass / Low-frequency slot (~40-250 Hz)
-          let bassSustained = sustainedBass * 32.0
-          let bassBop = bop.x * 85.0
+          let bassSustained = sustainedBass * 48.0
+          let bassBop = bop.x * 75.0
           let bassBeat = beatPulseIntensity * 30.0
-          let bassBand = lowBandBoost * 35.0
-          let bassBurst = (bassSustained + bassBop + bassBeat + bassBand) * (index < 3 ? 1.2 : 1.0)
+          let bassBand = (lowBandBoost + bandEnergy * 0.45) * 35.0
+          let bassBurst = (bassSustained + bassBop + bassBeat + bassBand) * (index < 3 ? 1.25 : 1.0)
           requestedBirthRate =
             (slotFloor + bassBurst) * model.intensity * roomReduction
             * blendedDynamics.birthMultiplier
-          let baseSize: Float = 0.0022 + activity * 0.0035
+          let baseSize: Float = 0.006 + activity * 0.007
           dynamicSize =
-            min(0.038, (baseSize + sustainedBass * 0.012 + bop.x * 0.016 + beatPulseIntensity * 0.012 + lowBandBoost * 0.008)
+            min(0.038, (baseSize + sustainedBass * 0.016 + bop.x * 0.018 + beatPulseIntensity * 0.012 + lowBandBoost * 0.008)
             * activeDynamics.sizeScale * 1.2)
-          slotSpeed = 0.06 + sustainedBass * 0.15 + bop.x * 0.35 + blendedDynamics.speedBoost * 0.6
+          slotSpeed = 0.12 + sustainedBass * 0.35 + bop.x * 0.45 + blendedDynamics.speedBoost * 0.6
           slotLifespan = activeDynamics.lifeSpan ?? Double(2.2 + aurora * 0.5)
-          slotNoise = 0.02 + sustainedBass * 0.02 + bop.x * 0.03
+          slotNoise = 0.02 + sustainedBass * 0.03 + bop.x * 0.04
           slotSpread = 0.20 + blendedDynamics.spreadBoost * 0.6
           slotHueOffset = -0.04
           particles.emitterShapeSize =
             currentForm.dimensions * shapeScale * (0.85 + sustainedBass * 0.45 + bop.x * 0.35)
 
         case 1:  // Mid / Melodic body slot (~250-2500 Hz)
-          let midSustained = sustainedMid * 36.0
-          let midBop = bop.y * 95.0
-          let midBand = midBandBoost * 35.0
-          let midBurst = (midSustained + midBop + midBand + bandEnergy * 15.0) * (index >= 3 && index <= 6 ? 1.2 : 1.0)
+          let midSustained = sustainedMid * 52.0
+          let midBop = bop.y * 85.0
+          let midBand = (midBandBoost + bandEnergy * 0.55) * 35.0
+          let midBurst = (midSustained + midBop + midBand) * (index >= 3 && index <= 6 ? 1.25 : 1.0)
           requestedBirthRate =
             (slotFloor + midBurst) * model.intensity * roomReduction
             * blendedDynamics.birthMultiplier
-          let baseSize: Float = 0.0014 + activity * 0.0025
+          let baseSize: Float = 0.004 + activity * 0.005
           dynamicSize =
-            min(0.026, (baseSize + sustainedMid * 0.008 + bop.y * 0.012 + midBandBoost * 0.006) * activeDynamics.sizeScale)
-          slotSpeed = 0.08 + sustainedMid * 0.45 + bop.y * 0.55 + vortex * 0.25 + blendedDynamics.speedBoost
+            min(0.028, (baseSize + sustainedMid * 0.012 + bop.y * 0.014 + midBandBoost * 0.008) * activeDynamics.sizeScale)
+          slotSpeed = 0.14 + sustainedMid * 0.55 + bop.y * 0.65 + vortex * 0.25 + blendedDynamics.speedBoost
           slotLifespan = activeDynamics.lifeSpan ?? Double(1.8 + aurora * 0.4)
-          slotNoise = 0.03 + sustainedMid * 0.04 + bop.y * 0.06
+          slotNoise = 0.03 + sustainedMid * 0.05 + bop.y * 0.07
           slotSpread = 0.28 + blendedDynamics.spreadBoost
           slotHueOffset = 0.0
           particles.emitterShapeSize =
-            currentForm.dimensions * shapeScale * (0.75 + sustainedMid * 0.30 + bop.y * 0.25)
+            currentForm.dimensions * shapeScale * (0.75 + sustainedMid * 0.35 + bop.y * 0.25)
 
         default:  // High / Treble sizzle slot (~2500-16000 Hz)
-          let trebleSustained = sustainedTreble * 30.0
-          let trebleBop = bop.z * 105.0
-          let trebleBurst = (trebleSustained + trebleBop + highEnergy * 20.0 + highFlux * 35.0) * (index >= 7 && index <= 9 ? 1.2 : 1.0)
+          let trebleSustained = sustainedTreble * 42.0
+          let trebleBop = bop.z * 95.0
+          let trebleBurst = (trebleSustained + trebleBop + highEnergy * 25.0 + highFlux * 35.0) * (index >= 7 && index <= 9 ? 1.25 : 1.0)
           requestedBirthRate =
             (slotFloor + trebleBurst) * model.intensity * roomReduction
             * blendedDynamics.birthMultiplier
-          let baseSize: Float = 0.0009 + activity * 0.0018
+          let baseSize: Float = 0.0025 + activity * 0.0035
           dynamicSize =
-            min(0.015, (baseSize + sustainedTreble * 0.006 + bop.z * 0.008) * activeDynamics.sizeScale * 0.75)
-          slotSpeed = 0.10 + sustainedTreble * 0.65 + bop.z * 0.85 + blendedDynamics.speedBoost * 1.1
-          slotLifespan = (activeDynamics.lifeSpan ?? Double(1.2 + aurora * 0.3)) * 0.7
+            min(0.018, (baseSize + sustainedTreble * 0.008 + bop.z * 0.010) * activeDynamics.sizeScale * 0.75)
+          slotSpeed = 0.16 + sustainedTreble * 0.75 + bop.z * 0.95 + blendedDynamics.speedBoost * 1.1
+          slotLifespan = (activeDynamics.lifeSpan ?? Double(1.4 + aurora * 0.3)) * 0.8
           slotNoise = 0.05 + bop.z * 0.30
           slotSpread = 0.36 + trebleSizzle * 0.20 + blendedDynamics.spreadBoost * 1.2
           slotHueOffset = 0.06
           slotStretch = (activeDynamics.stretch ?? 1.0) * (1.5 + (trebleSustained * 0.02 + bop.z * 1.8))
           particles.emitterShapeSize =
-            currentForm.dimensions * shapeScale * (0.65 + sustainedTreble * 0.25 + bop.z * 0.25)
+            currentForm.dimensions * shapeScale * (0.65 + sustainedTreble * 0.30 + bop.z * 0.25)
         }
 
         particles.speed = slotSpeed
